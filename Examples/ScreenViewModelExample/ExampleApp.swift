@@ -21,9 +21,8 @@ final class DemoModel: ScreenModel<DemoAction> {
     var fact = "No task yet."
     var trace: [String] = []
     private var loadID = 0
-    private var stopLoad: (() -> Void)?
 
-    override func observable(action: DemoAction, cancel: @escaping () -> Void) -> Effect<DemoAction> {
+    override func observable(action: DemoAction, cancel: Cancel) -> Effect<DemoAction> {
         switch action {
         case .appear:
             note("appear → .onDisappear")
@@ -56,20 +55,18 @@ final class DemoModel: ScreenModel<DemoAction> {
             let id = loadID
             loading = true
             fact = "Task \(id) is running."
-            stopLoad = cancel
-            note("load → .task \(id). Stop calls cancel() for this action.")
-            return .task(.userInitiated) { send in
+            note("load → .task \(id) id load. Stop calls cancel(\"load\").")
+            return .task(.userInitiated, id: "load") { send in
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 guard !Task.isCancelled else { return }
                 send(.loaded(id))
             }
 
         case .stop:
-            stopLoad?()
-            stopLoad = nil
+            cancel("load")
             loading = false
             fact = "Cancelled."
-            note("stop → cancel() for the load action")
+            note("stop → cancel(\"load\")")
             return .none
 
         case .loaded(let id):
