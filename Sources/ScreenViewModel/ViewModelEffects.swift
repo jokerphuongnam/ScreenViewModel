@@ -28,6 +28,7 @@ final class EffectSlot {
 
 /// Holds anonymous effects and effects stored under an id.
 final class ViewModelEffects {
+    private var finished = false
     var anonymousOnNext: (() -> Void)?
     var anonymousOnNextTicket: EffectTicket?
     var anonymousOnDisappear: (() -> Void)?
@@ -135,6 +136,8 @@ final class ViewModelEffects {
     }
 
     func cancelAll() {
+        guard !finished else { return }
+        finished = true
         fireAnonymousOnNext()
         let disappear = anonymousOnDisappear
         anonymousOnDisappear = nil
@@ -156,9 +159,6 @@ final class ViewModelEffects {
     }
 
     deinit {
-        anonymousTask?.cancel()
-        anonymousOnNext?()
-        anonymousOnDisappear?()
-        for slot in named.values { slot.finish() }
+        cancelAll()
     }
 }

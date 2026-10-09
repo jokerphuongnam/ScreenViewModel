@@ -16,7 +16,7 @@ import ScreenViewModel
 
 ## Use it
 
-Subclass `ScreenModel` and override `observable`. Hold the model in the view with `@State`. Call `disappear()` from the view's `onDisappear`, or a named effect stays alive until something cancels it. `ScreenAction` is the marker for an action enum.
+Subclass `ScreenModel` and override `observable`. Hold the model in the view with `@State`. When that view releases the model, tasks are cancelled and stored cleanups run. Call `disappear()` only when the same model stays alive after the view is gone. `ScreenAction` is the marker for an action enum.
 
 ```swift
 enum DemoAction: ScreenAction {
@@ -49,7 +49,6 @@ final class DemoModel: ScreenModel<DemoAction> {
 
 var body: some View {
     Button("Load") { model.send(.load, id: &loadID) }
-        .onDisappear { model.disappear() }
 }
 ```
 

@@ -11,7 +11,18 @@ open class ScreenModel<Action>: ViewModel {
 
     public init() {}
 
-    /// Runs every disappear cleanup and cancels every `.task` still in flight.
+    deinit {
+        let effects = effects
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                effects.cancelAll()
+            }
+        }
+    }
+
+    /// Cancels every `.task` and runs every stored cleanup.
+    /// A model owned by the view already does this when the view releases it.
+    /// Call this only when the model stays alive after the view is gone.
     public func disappear() {
         effects.cancelAll()
     }

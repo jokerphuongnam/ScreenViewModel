@@ -136,7 +136,6 @@ struct DemoScreen: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .navigationTitle("Every effect")
         .onAppear { model.send(.appear) }
-        .onDisappear { model.disappear() }
     }
 }
 
