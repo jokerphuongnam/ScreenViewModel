@@ -19,14 +19,29 @@ public struct IdentifiedAction<Action> {
     public let id: EffectID
 }
 
-/// Opt in so a call site can write `.load.id(&id)`.
+/// Opt in so a call site can write `model.send(.load.id(&id))`.
 /// Passing an id means that effect can be cancelled with `cancel(id)`.
 public protocol ScreenAction {}
 
 extension ScreenAction {
-    public func id(_ id: inout EffectID?) -> IdentifiedAction<Self> {
+    /// Writes `id` when it is nil and returns the same action.
+    /// The returned type stays `Self`, so Swift can infer `.load` inside `send`.
+    @MainActor
+    public func id(_ id: inout EffectID?) -> Self {
         let resolved = id ?? EffectID()
         id = resolved
-        return IdentifiedAction(action: self, id: resolved)
+        EffectIDClaim.current = resolved
+        return self
+    }
+}
+
+@MainActor
+enum EffectIDClaim {
+    static var current: EffectID?
+
+    static func take() -> EffectID? {
+        let value = current
+        current = nil
+        return value
     }
 }

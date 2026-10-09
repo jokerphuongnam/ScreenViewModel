@@ -121,7 +121,7 @@ struct DemoScreen: View {
                 Button("Add two  .redirect") { model.send(.addTwo) }
                 Button("Arm  .onNext") { model.send(.arm) }
                 Button("Load  .id(&id)") {
-                    model.send(DemoAction.load.id(&loadID))
+                    model.send(.load.id(&loadID))
                 }
                 .disabled(model.loading)
                 Button("Stop  cancel(id)") {

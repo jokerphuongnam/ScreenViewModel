@@ -20,6 +20,11 @@ let package = Package(
             name: "ScreenViewModelExample",
             dependencies: ["ScreenViewModel"],
             path: "Examples/ScreenViewModelExample"
+        ),
+        .testTarget(
+            name: "ScreenViewModelTests",
+            dependencies: ["ScreenViewModel"],
+            path: "Sources/Tests"
         )
     ]
 )

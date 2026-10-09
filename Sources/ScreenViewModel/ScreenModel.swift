@@ -13,18 +13,19 @@ open class ScreenModel<Action>: ViewModel {
         effects.cancelAll()
     }
 
-    @_disfavoredOverload
     public func send(_ action: Action) {
-        deliver(action, forcedID: nil)
+        deliver(action, forcedID: EffectIDClaim.take())
     }
 
-    /// Stores the effect from this action under `identified.id`, and writes that id back through `.id(&_:)`.
+    /// Stores the effect from this action under `identified.id`.
     public func send(_ identified: IdentifiedAction<Action>) {
+        _ = EffectIDClaim.take()
         deliver(identified.action, forcedID: identified.id)
     }
 
     /// Same as `.id(&id)`. The id is created when `id` is nil, then the effect is stored under it.
     public func send(_ action: Action, id: inout EffectID?) {
+        _ = EffectIDClaim.take()
         let resolved = id ?? EffectID()
         id = resolved
         deliver(action, forcedID: resolved)
