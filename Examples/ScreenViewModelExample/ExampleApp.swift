@@ -9,6 +9,7 @@ enum DemoAction {
     case addTwo
     case arm
     case load
+    case stop
     case loaded(Int)
 }
 
@@ -20,8 +21,9 @@ final class DemoModel: ScreenModel<DemoAction> {
     var fact = "No task yet."
     var trace: [String] = []
     private var loadID = 0
+    private var stopLoad: (() -> Void)?
 
-    override func observable(action: DemoAction) -> Effect<DemoAction> {
+    override func observable(action: DemoAction, cancel: @escaping () -> Void) -> Effect<DemoAction> {
         switch action {
         case .appear:
             note("appear → .onDisappear")
@@ -54,12 +56,21 @@ final class DemoModel: ScreenModel<DemoAction> {
             let id = loadID
             loading = true
             fact = "Task \(id) is running."
-            note("load → .task \(id). A newer task, or leaving the screen, cancels it.")
+            stopLoad = cancel
+            note("load → .task \(id). Stop calls cancel() for this action.")
             return .task(.userInitiated) { send in
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 guard !Task.isCancelled else { return }
                 send(.loaded(id))
             }
+
+        case .stop:
+            stopLoad?()
+            stopLoad = nil
+            loading = false
+            fact = "Cancelled."
+            note("stop → cancel() for the load action")
+            return .none
 
         case .loaded(let id):
             loading = false
@@ -114,6 +125,8 @@ struct DemoScreen: View {
                 Button("Arm  .onNext") { model.send(.arm) }
                 Button("Load  .task") { model.send(.load) }
                     .disabled(model.loading)
+                Button("Stop  cancel()") { model.send(.stop) }
+                    .disabled(!model.loading)
             }
             TraceList(lines: model.trace)
         }
