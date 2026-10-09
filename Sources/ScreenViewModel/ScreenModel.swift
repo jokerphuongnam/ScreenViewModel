@@ -15,6 +15,37 @@ public enum Effect<Action> {
     case task(TaskPriority, id: AnyHashable? = nil, (_ send: (Action) -> Void) async -> Void)
 }
 
+/// An id the caller can keep and later pass to `cancel(_:)`.
+public struct EffectID: Hashable {
+    public let raw: AnyHashable
+
+    public init() {
+        raw = AnyHashable(UUID())
+    }
+
+    public init(_ value: some Hashable) {
+        raw = AnyHashable(value)
+    }
+}
+
+/// An action plus the id its effect should be stored under.
+public struct IdentifiedAction<Action> {
+    public let action: Action
+    public let id: EffectID
+}
+
+/// Opt in so a call site can write `.load.id(&id)`.
+/// Passing an id means that effect can be cancelled with `cancel(id)`.
+public protocol ScreenAction {}
+
+extension ScreenAction {
+    public func id(_ id: inout EffectID?) -> IdentifiedAction<Self> {
+        let resolved = id ?? EffectID()
+        id = resolved
+        return IdentifiedAction(action: self, id: resolved)
+    }
+}
+
 /// Cancels effects returned from `observable`.
 ///
 /// `cancel()` cancels the effect this call returned. `cancel(id)` cancels the effect stored under that id.
@@ -51,13 +82,39 @@ open class ScreenModel<Action>: ViewModel {
         effects.cancelAll()
     }
 
+    @_disfavoredOverload
     public func send(_ action: Action) {
+        deliver(action, forcedID: nil)
+    }
+
+    /// Stores the effect from this action under `identified.id`, and writes that id back through `.id(&_:)`.
+    public func send(_ identified: IdentifiedAction<Action>) {
+        deliver(identified.action, forcedID: identified.id)
+    }
+
+    /// Same as `.id(&id)`. The id is created when `id` is nil, then the effect is stored under it.
+    public func send(_ action: Action, id: inout EffectID?) {
+        let resolved = id ?? EffectID()
+        id = resolved
+        deliver(action, forcedID: resolved)
+    }
+
+    /// Cancels the effect stored with this id.
+    public func cancel(_ id: EffectID) {
+        effects.cancel(id: id.raw)
+    }
+
+    public func cancel(_ id: some Hashable) {
+        effects.cancel(id: id)
+    }
+
+    private func deliver(_ action: Action, forcedID: EffectID?) {
         effects.fireAnonymousOnNext()
         let ticket = EffectTicket()
         let cancel = Cancel(ticket: ticket, effects: effects)
         let effect = observable(action: action, cancel: cancel)
         guard !ticket.cancelled else { return }
-        apply(effect, ticket: ticket, depth: 0)
+        apply(effect, ticket: ticket, forcedID: forcedID, depth: 0)
     }
 
     open func observable(action: Action, cancel: Cancel) -> Effect<Action> {
@@ -65,7 +122,7 @@ open class ScreenModel<Action>: ViewModel {
         return .none
     }
 
-    private func apply(_ effect: Effect<Action>, ticket: EffectTicket, depth: Int) {
+    private func apply(_ effect: Effect<Action>, ticket: EffectTicket, forcedID: EffectID?, depth: Int) {
         switch effect {
         case .none:
             break
@@ -75,13 +132,13 @@ open class ScreenModel<Action>: ViewModel {
             let next = EffectTicket()
             let followed = observable(action: action, cancel: Cancel(ticket: next, effects: effects))
             guard !next.cancelled else { return }
-            apply(followed, ticket: next, depth: depth + 1)
+            apply(followed, ticket: next, forcedID: forcedID, depth: depth + 1)
         case .onNext(let id, let cleanup):
-            effects.store(ticket: ticket, id: id, onNext: cleanup)
+            effects.store(ticket: ticket, id: forcedID?.raw ?? id, onNext: cleanup)
         case .onDisappear(let id, let cleanup):
-            effects.store(ticket: ticket, id: id, onDisappear: cleanup)
+            effects.store(ticket: ticket, id: forcedID?.raw ?? id, onDisappear: cleanup)
         case .task(let priority, let id, let work):
-            effects.store(ticket: ticket, id: id, task: Task(priority: priority) { [weak self] in
+            effects.store(ticket: ticket, id: forcedID?.raw ?? id, task: Task(priority: priority) { [weak self] in
                 await work { action in
                     self?.send(action)
                 }

@@ -2,7 +2,7 @@ import Observation
 import ScreenViewModel
 import SwiftUI
 
-enum DemoAction {
+enum DemoAction: ScreenAction {
     case appear
     case addOne
     case addOneThenOne
@@ -55,18 +55,17 @@ final class DemoModel: ScreenModel<DemoAction> {
             let id = loadID
             loading = true
             fact = "Task \(id) is running."
-            note("load → .task \(id) id load. Stop calls cancel(\"load\").")
-            return .task(.userInitiated, id: "load") { send in
+            note("load → .task \(id). The button passes .id(&loadID) so Stop can cancel that id.")
+            return .task(.userInitiated) { send in
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 guard !Task.isCancelled else { return }
                 send(.loaded(id))
             }
 
         case .stop:
-            cancel("load")
             loading = false
             fact = "Cancelled."
-            note("stop → cancel(\"load\")")
+            note("stop → caller already ran cancel(loadID)")
             return .none
 
         case .loaded(let id):
@@ -109,6 +108,7 @@ struct ExampleApp: App {
 
 struct DemoScreen: View {
     @Bindable var model: DemoModel
+    @State private var loadID: EffectID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -120,10 +120,15 @@ struct DemoScreen: View {
                 Button("Add one  .none") { model.send(.addOne) }
                 Button("Add two  .redirect") { model.send(.addTwo) }
                 Button("Arm  .onNext") { model.send(.arm) }
-                Button("Load  .task") { model.send(.load) }
-                    .disabled(model.loading)
-                Button("Stop  cancel()") { model.send(.stop) }
-                    .disabled(!model.loading)
+                Button("Load  .id(&id)") {
+                    model.send(DemoAction.load.id(&loadID))
+                }
+                .disabled(model.loading)
+                Button("Stop  cancel(id)") {
+                    if let loadID { model.cancel(loadID) }
+                    model.send(.stop)
+                }
+                .disabled(loadID == nil || !model.loading)
             }
             TraceList(lines: model.trace)
         }
