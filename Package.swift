@@ -8,9 +8,15 @@ let package = Package(
         .iOS(.v17)
     ],
     products: [
-        .library(name: "ScreenViewModel", targets: ["ScreenViewModel"])
+        .library(name: "ScreenViewModel", targets: ["ScreenViewModel"]),
+        .executable(name: "ScreenViewModelExample", targets: ["ScreenViewModelExample"])
     ],
     targets: [
-        .target(name: "ScreenViewModel")
+        .target(name: "ScreenViewModel"),
+        .executableTarget(
+            name: "ScreenViewModelExample",
+            dependencies: ["ScreenViewModel"],
+            path: "Examples/ScreenViewModelExample"
+        )
     ]
 )

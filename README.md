@@ -11,3 +11,9 @@ Supported platforms: macOS 14 and iOS 17.
 ```swift
 import ScreenViewModel
 ```
+
+Run the example on macOS. It walks through `.none`, `.redirect`, `.onNext`, `.onDisappear`, and `.task`:
+
+```sh
+swift run ScreenViewModelExample
+```
