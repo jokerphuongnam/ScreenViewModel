@@ -55,7 +55,7 @@ final class DemoModel: ScreenModel<DemoAction> {
             let id = loadID
             loading = true
             fact = "Task \(id) is running."
-            note("load → .task \(id). The button passes .id(&loadID) so Stop can cancel that id.")
+            note("load → .task \(id). The button passes send(.load, id:) so Stop can cancel that id.")
             return .task(.userInitiated) { send in
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 guard !Task.isCancelled else { return }
@@ -120,8 +120,8 @@ struct DemoScreen: View {
                 Button("Add one  .none") { model.send(.addOne) }
                 Button("Add two  .redirect") { model.send(.addTwo) }
                 Button("Arm  .onNext") { model.send(.arm) }
-                Button("Load  .id(&id)") {
-                    model.send(.load.id(&loadID))
+                Button("Load  send(_:id:)") {
+                    model.send(.load, id: &loadID)
                 }
                 .disabled(model.loading)
                 Button("Stop  cancel(id)") {

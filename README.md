@@ -16,7 +16,7 @@ import ScreenViewModel
 
 ## Use it
 
-Conform the action enum to `ScreenAction`. Subclass `ScreenModel` and override `observable`. Hold the model in the view with `@State`. Call `disappear()` from the view's `onDisappear`, or a named effect stays alive until something cancels it.
+Subclass `ScreenModel` and override `observable`. Hold the model in the view with `@State`. Call `disappear()` from the view's `onDisappear`, or a named effect stays alive until something cancels it. `ScreenAction` is the marker for an action enum.
 
 ```swift
 enum DemoAction: ScreenAction {
@@ -48,19 +48,21 @@ final class DemoModel: ScreenModel<DemoAction> {
 @State private var loadID: EffectID?
 
 var body: some View {
-    Button("Load") { model.send(.load.id(&loadID)) }
+    Button("Load") { model.send(.load, id: &loadID) }
         .onDisappear { model.disappear() }
 }
 ```
 
-`model.send(.load.id(&loadID))` writes a new `EffectID` into `loadID` when it is nil, then stores the effect under that id. The same call with the same variable reuses the id. This also works:
+`model.send(.load, id: &loadID)` writes a new `EffectID` into `loadID` when it is nil, then stores the effect under that id. The same variable reuses the id. Cancel it with `model.cancel(loadID!)`.
+
+A static member of the action type can be sent through dynamic member lookup. `model.load` is `model.send(.load)` when `Action` has `static var load` or `static let load`. Chain `.id` when that effect needs a handle:
 
 ```swift
-model.send(.load, id: &loadID)
-model.cancel(loadID!)
+model.load
+model.load.id(&loadID)
 ```
 
-`.id` returns the same action, so Swift can infer `.load` inside `send`. Use `.id` in the same expression as `send`.
+Swift builds that lookup as a key path to the static member. A key path cannot refer to an enum case, so `case load` still goes through `send`. The subscript returns the model so `.id(&id)` can move the effect just stored onto that id. Swift does not allow `@discardableResult` on a subscript, so a bare `model.load` warns that the result is unused. `.id` is `@discardableResult`.
 
 ## Effect
 
@@ -92,13 +94,13 @@ Tests live in `Sources/Tests`. Run them with `swift test`.
 
 ## Versions
 
-| Tag | Was | Contents |
-| --- | --- | --- |
-| `0.1.0-beta01` | `1.0.0` | `send`, `Effect`, and task cancellation |
-| `0.1.1-beta02` | `1.0.1` | Example executable |
-| `0.2.0-beta03` | `1.1.0` | watchOS, tvOS, and visionOS |
-| `0.3.0-beta04` | `1.2.0` | `cancel` passed into `observable` |
-| `0.4.0-beta05` | `1.3.0` | `cancel` by id |
-| `0.5.0-beta06` | `1.4.0` | Call-site id. `.id` returned a wrapper, so `send(.load.id(&id))` did not type-check |
-| `0.6.0-beta07` | untagged | Sources split by type |
-| `1.0.0` | — | Stable API, tests, and `send(.load.id(&id))` |
+| Tag | Contents |
+| --- | --- |
+| `0.1.0-beta01` | `send`, `Effect`, and task cancellation |
+| `0.1.1-beta02` | Example executable |
+| `0.2.0-beta03` | watchOS, tvOS, and visionOS |
+| `0.3.0-beta04` | `cancel` passed into `observable` |
+| `0.4.0-beta05` | `cancel` by id |
+| `0.5.0-beta06` | Call-site id |
+| `0.6.0-beta07` | Sources split by type |
+| `1.0.0` | Stable API and the test suite. Pass an id with `send(_:id:)` |

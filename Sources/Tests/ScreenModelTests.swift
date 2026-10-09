@@ -174,13 +174,22 @@ final class ScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func testActionIdWritesTheHandleBack() throws {
-        let model = Probe()
-        model.effectsByAction[.arm] = .onNext { model.log.append("held") }
+    func testMemberLookupSendsTheStaticAction() {
+        let model = StaticProbe()
+        let sent = model.arm
+        XCTAssertTrue(sent === model)
+        XCTAssertEqual(model.seen, [.arm])
+        _ = model.plain
+        XCTAssertEqual(model.log, ["held"])
+    }
+
+    @MainActor
+    func testMemberIdStoresTheEffectUnderThatId() throws {
+        let model = StaticProbe()
         var id: EffectID?
-        model.send(.arm.id(&id))
+        _ = model.arm.id(&id)
         let saved = try XCTUnwrap(id)
-        model.send(.arm.id(&id))
+        _ = model.arm.id(&id)
         XCTAssertEqual(id, saved)
         XCTAssertEqual(model.log, ["held"])
         model.cancel(saved)
@@ -243,6 +252,26 @@ private final class Probe: ScreenModel<ProbeAction> {
             cancel()
         }
         return effectsByAction[action] ?? .none
+    }
+}
+
+private struct StaticAction: Hashable {
+    var name: String
+    static let arm = StaticAction(name: "arm")
+    static let plain = StaticAction(name: "plain")
+}
+
+@MainActor
+private final class StaticProbe: ScreenModel<StaticAction> {
+    var seen: [StaticAction] = []
+    var log: [String] = []
+
+    override func observable(action: StaticAction, cancel: Cancel) -> Effect<StaticAction> {
+        seen.append(action)
+        if action == .arm {
+            return .onNext { self.log.append("held") }
+        }
+        return .none
     }
 }
 
