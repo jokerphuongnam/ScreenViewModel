@@ -13,8 +13,9 @@ open class ScreenModel<Action>: ViewModel {
         if Thread.isMainThread {
             effects.cancelAll()
         } else {
+            nonisolated(unsafe) let queued = effects
             DispatchQueue.main.async {
-                effects.cancelAll()
+                queued.cancelAll()
             }
         }
     }
@@ -27,19 +28,37 @@ open class ScreenModel<Action>: ViewModel {
     }
 
     public func send(_ action: Action) {
-        deliver(action, forcedID: nil)
+        _ = deliver(action, forcedID: nil)
     }
 
     /// Stores the effect from this action under `identified.id`.
     public func send(_ identified: IdentifiedAction<Action>) {
-        deliver(identified.action, forcedID: identified.id)
+        _ = deliver(identified.action, forcedID: identified.id)
     }
 
     /// The id is created when `id` is nil, then the effect is stored under it.
     public func send(_ action: Action, id: inout EffectID?) {
         let resolved = id ?? EffectID()
         id = resolved
-        deliver(action, forcedID: resolved)
+        _ = deliver(action, forcedID: resolved)
+    }
+
+    /// `model[.load]()` sends that case. `model[.load].id(&id)` stores the effect.
+    public subscript(_ action: Action) -> ScreenActionCall<Action> {
+        ScreenActionCall(model: self, action: action)
+    }
+
+    func deliver(_ action: Action, forcedID: EffectID?) -> EffectTicket? {
+        effects.fireAnonymousOnNext()
+        let ticket = EffectTicket()
+        let cancel = Cancel(ticket: ticket, effects: effects)
+        let effect = observable(action: action, cancel: cancel)
+        guard !ticket.cancelled else { return nil }
+        return apply(effect, ticket: ticket, forcedID: forcedID, depth: 0)
+    }
+
+    func rekey(_ ticket: EffectTicket, to id: EffectID) {
+        effects.rekey(ticket, to: id.raw)
     }
 
     /// Cancels the effect stored with this id.
@@ -51,46 +70,41 @@ open class ScreenModel<Action>: ViewModel {
         effects.cancel(id: id)
     }
 
-    private func deliver(_ action: Action, forcedID: EffectID?) {
-        effects.fireAnonymousOnNext()
-        let ticket = EffectTicket()
-        let cancel = Cancel(ticket: ticket, effects: effects)
-        let effect = observable(action: action, cancel: cancel)
-        guard !ticket.cancelled else { return }
-        apply(effect, ticket: ticket, forcedID: forcedID, depth: 0)
-    }
-
     open func observable(action: Action, cancel: Cancel) -> Effect<Action> {
         _ = cancel
         return .none
     }
 
+    @discardableResult
     private func apply(
         _ effect: Effect<Action>,
         ticket: EffectTicket,
         forcedID: EffectID?,
         depth: Int
-    ) {
+    ) -> EffectTicket? {
         switch effect {
         case .none:
-            break
+            return nil
         case .redirect(let action):
-            guard depth < 16 else { return }
+            guard depth < 16 else { return nil }
             effects.fireAnonymousOnNext()
             let next = EffectTicket()
             let followed = observable(action: action, cancel: Cancel(ticket: next, effects: effects))
-            guard !next.cancelled else { return }
-            apply(followed, ticket: next, forcedID: forcedID, depth: depth + 1)
+            guard !next.cancelled else { return nil }
+            return apply(followed, ticket: next, forcedID: forcedID, depth: depth + 1)
         case .onNext(let id, let cleanup):
             effects.store(ticket: ticket, id: forcedID?.raw ?? id, onNext: cleanup)
+            return ticket
         case .onDisappear(let id, let cleanup):
             effects.store(ticket: ticket, id: forcedID?.raw ?? id, onDisappear: cleanup)
+            return ticket
         case .task(let priority, let id, let work):
             effects.store(ticket: ticket, id: forcedID?.raw ?? id, task: Task(priority: priority) { [weak self] in
                 await work { action in
                     self?.send(action)
                 }
             })
+            return ticket
         }
     }
 }

@@ -102,6 +102,9 @@ struct ExampleApp: App {
                 .frame(minWidth: 520, minHeight: 420)
                 .navigationTitle("ScreenViewModel")
             }
+            .onAppear {
+                model[.addOne]()
+            }
         }
     }
 }

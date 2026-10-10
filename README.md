@@ -52,7 +52,9 @@ var body: some View {
 }
 ```
 
-`model.send(.load, id: &loadID)` writes a new `EffectID` into `loadID` when it is nil, then stores the effect under that id. The same variable reuses the id. Cancel it with `model.cancel(loadID!)`. Send an action with `model.send`. There is no `model.load` lookup. A key path cannot refer to an enum case.
+`model.send(.load, id: &loadID)` writes a new `EffectID` into `loadID` when it is nil, then stores the effect under that id. The same variable reuses the id. Cancel it with `model.cancel(loadID!)`.
+
+An enum case can be sent through the subscript. `model[.load]()` sends `.load`. `model[.load].id(&loadID)` and `model[.load]().id(&loadID)` store that effect under the id.
 
 ## Effect
 
