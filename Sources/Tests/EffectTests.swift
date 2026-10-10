@@ -1,7 +1,7 @@
 import XCTest
 @testable import ScreenViewModel
 
-final class ScreenModelTests: XCTestCase {
+final class EffectTests: XCTestCase {
     @MainActor
     func testNoneDoesNothing() {
         let model = Probe()
@@ -174,37 +174,6 @@ final class ScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func testSubscriptSendsAnEnumCase() {
-        let model = Probe()
-        model[.plain]()
-        XCTAssertEqual(model.seen, [.plain])
-    }
-
-    @MainActor
-    func testCallSendsTheStaticAction() {
-        let model = StaticProbe()
-        model[.arm]()
-        XCTAssertEqual(model.seen, [.arm])
-        model[.plain]()
-        XCTAssertEqual(model.log, ["held"])
-    }
-
-    @MainActor
-    func testMemberIdMatchesCallThenId() throws {
-        let direct = StaticProbe()
-        var directID: EffectID?
-        _ = direct[.arm].id(&directID)
-        direct.cancel(try XCTUnwrap(directID))
-        XCTAssertEqual(direct.log, ["held"])
-
-        let called = StaticProbe()
-        var calledID: EffectID?
-        _ = called[.arm]().id(&calledID)
-        called.cancel(try XCTUnwrap(calledID))
-        XCTAssertEqual(called.log, ["held"])
-    }
-
-    @MainActor
     func testDisappearCancelsAnAnonymousTask() {
         let model = Probe()
         let started = expectation(description: "started")
@@ -239,59 +208,4 @@ final class ScreenModelTests: XCTestCase {
         }
         XCTAssertEqual(box.lines, ["dead"])
     }
-}
-
-private final class LogBox {
-    var lines: [String] = []
-}
-
-@MainActor
-private final class Probe: ScreenModel<ProbeAction> {
-    var effectsByAction: [ProbeAction: Effect<ProbeAction>] = [:]
-    var seen: [ProbeAction] = []
-    var log: [String] = []
-    var dropLoad = false
-    var onEvent: ((ProbeAction) -> Void)?
-
-    override func observable(action: ProbeAction, cancel: Cancel) -> Effect<ProbeAction> {
-        seen.append(action)
-        onEvent?(action)
-        if dropLoad, action == .load {
-            cancel()
-        }
-        return effectsByAction[action] ?? .none
-    }
-}
-
-private struct StaticAction: Hashable {
-    var name: String
-    static let arm = StaticAction(name: "arm")
-    static let plain = StaticAction(name: "plain")
-}
-
-@MainActor
-private final class StaticProbe: ScreenModel<StaticAction> {
-    var seen: [StaticAction] = []
-    var log: [String] = []
-
-    override func observable(action: StaticAction, cancel: Cancel) -> Effect<StaticAction> {
-        seen.append(action)
-        if action == .arm {
-            return .onNext { self.log.append("held") }
-        }
-        return .none
-    }
-}
-
-private enum ProbeAction: ScreenAction, Hashable {
-    case plain
-    case addOne
-    case addOneThenOne
-    case addTwo
-    case arm
-    case appear
-    case load
-    case reload
-    case loop
-    case loaded(Int)
 }
