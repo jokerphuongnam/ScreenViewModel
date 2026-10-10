@@ -97,40 +97,6 @@ final class ViewModelEffects {
         }
     }
 
-    func rekey(_ ticket: EffectTicket, to raw: AnyHashable) {
-        if anonymousOnNextTicket === ticket {
-            let cleanup = anonymousOnNext
-            anonymousOnNext = nil
-            anonymousOnNextTicket = nil
-            if let cleanup {
-                replaceNamed(id: raw, ticket: ticket).onNext = cleanup
-            }
-            return
-        }
-        if anonymousOnDisappearTicket === ticket {
-            let cleanup = anonymousOnDisappear
-            anonymousOnDisappear = nil
-            anonymousOnDisappearTicket = nil
-            if let cleanup {
-                replaceNamed(id: raw, ticket: ticket).onDisappear = cleanup
-            }
-            return
-        }
-        if anonymousTaskTicket === ticket, let task = anonymousTask {
-            anonymousTask = nil
-            anonymousTaskTicket = nil
-            let slot = replaceNamed(id: raw, ticket: ticket)
-            slot.task?.cancel()
-            slot.task = task
-            return
-        }
-        guard let existingKey = named.first(where: { $0.value.ticket === ticket })?.key else { return }
-        guard existingKey != raw else { return }
-        guard let slot = named.removeValue(forKey: existingKey) else { return }
-        named.removeValue(forKey: raw)?.finish()
-        named[raw] = slot
-    }
-
     func cancel(id: some Hashable) {
         named.removeValue(forKey: AnyHashable(id))?.finish()
     }

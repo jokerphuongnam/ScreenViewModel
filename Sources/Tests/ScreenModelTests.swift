@@ -174,22 +174,12 @@ final class ScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func testMemberLookupSendsTheStaticAction() {
-        let model = StaticProbe()
-        let sent = model.arm
-        XCTAssertTrue(sent === model)
-        XCTAssertEqual(model.seen, [.arm])
-        _ = model.plain
-        XCTAssertEqual(model.log, ["held"])
-    }
-
-    @MainActor
-    func testMemberIdStoresTheEffectUnderThatId() throws {
+    func testSendWithIdReusesTheStoredId() throws {
         let model = StaticProbe()
         var id: EffectID?
-        _ = model.arm.id(&id)
+        model.send(.arm, id: &id)
         let saved = try XCTUnwrap(id)
-        _ = model.arm.id(&id)
+        model.send(.arm, id: &id)
         XCTAssertEqual(id, saved)
         XCTAssertEqual(model.log, ["held"])
         model.cancel(saved)

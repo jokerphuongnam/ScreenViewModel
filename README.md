@@ -52,16 +52,7 @@ var body: some View {
 }
 ```
 
-`model.send(.load, id: &loadID)` writes a new `EffectID` into `loadID` when it is nil, then stores the effect under that id. The same variable reuses the id. Cancel it with `model.cancel(loadID!)`.
-
-A static member of the action type can be sent through dynamic member lookup. `model.load` is `model.send(.load)` when `Action` has `static var load` or `static let load`. Chain `.id` when that effect needs a handle:
-
-```swift
-model.load
-model.load.id(&loadID)
-```
-
-Swift builds that lookup as a key path to the static member. A key path cannot refer to an enum case, so `case load` still goes through `send`. The subscript returns the model so `.id(&id)` can move the effect just stored onto that id. Swift does not allow `@discardableResult` on a subscript, so a bare `model.load` warns that the result is unused. `.id` is `@discardableResult`.
+`model.send(.load, id: &loadID)` writes a new `EffectID` into `loadID` when it is nil, then stores the effect under that id. The same variable reuses the id. Cancel it with `model.cancel(loadID!)`. Send an action with `model.send`. There is no `model.load` lookup. A key path cannot refer to an enum case.
 
 ## Effect
 
