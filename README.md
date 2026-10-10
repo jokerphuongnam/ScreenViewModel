@@ -5,14 +5,14 @@ A small view-model loop for a SwiftUI screen. The view calls `send`. The screen 
 Platforms: macOS 14, iOS 17, watchOS 10, tvOS 17, and visionOS 1. The screen loop uses Foundation and Observation. Parent, global, and share injection use SwiftUI. There is no AppKit or UIKit dependency.
 
 ```swift
-.package(url: "https://github.com/jokerphuongnam/ScreenViewModel", from: "1.0.0")
+.package(url: "https://github.com/jokerphuongnam/ScreenViewModel", from: "1.5.1")
 ```
 
 ```swift
 import ScreenViewModel
 ```
 
-`1.0.0` is the first stable release. It includes the test suite. Earlier publishes were pre-release tags named `0.x.x-betaXX`. Those tags are not a stable API.
+`1.5.1` is the current stable release. `1.0.0` is the first stable API. Tags named `0.x.x-betaXX` are pre-release and are not a stable API. Version numbers follow [Semantic Versioning](https://semver.org/): the third number is a small backward compatible fix, the second number adds backward compatible API, and the first number changes only when existing API breaks. Nothing since `1.0.0` breaks that API, so `from: "1.0.0"` accepts every release below.
 
 ## Use it
 
@@ -178,4 +178,13 @@ Tests live in `Sources/Tests`. Run them with `swift test`.
 | `0.4.0-beta05` | `cancel` by id |
 | `0.5.0-beta06` | Call-site id |
 | `0.6.0-beta07` | Sources split by type |
-| `1.0.0` | Stable API and the test suite. Pass an id with `send(_:id:)` |
+| `1.0.0` | First stable API and the test suite. Pass an id with `send(_:id:)`, or send an enum case with `model[.load]()` |
+| `1.0.1` | Tests split by behavior. No API change |
+| `1.1.0` | `.parentState` and `@ParentState` |
+| `1.2.0` | `shareState` and `@ShareState` |
+| `1.3.0` | `globalState` and `@GlobalState`. The model stays until the app exits |
+| `1.3.1` | Tests that a read of a shared model updates when that value changes |
+| `1.4.0` | `cache(key:)` and `@CacheState`. The key is a string |
+| `1.4.1` | Docs and the state example |
+| `1.5.0` | The same cache key with another result type is another cache. The same share id with another model type is another group |
+| `1.5.1` | This version list |
