@@ -8,6 +8,18 @@ final class CacheTests: XCTestCase {
     }
 
     @MainActor
+    func testSameKeyWithDifferentResultsAreDifferentCaches() async throws {
+        let text = try await cache(key: "fact", staleTime: .seconds(60), gcTime: .seconds(60)) { "A" }
+        let number = try await cache(key: "fact", staleTime: .seconds(60), gcTime: .seconds(60)) { 1 }
+        let textAgain = try await cache(key: "fact", staleTime: .seconds(60), gcTime: .seconds(60)) { "B" }
+        let numberAgain = try await cache(key: "fact", staleTime: .seconds(60), gcTime: .seconds(60)) { 2 }
+        XCTAssertEqual(text, "A")
+        XCTAssertEqual(number, 1)
+        XCTAssertEqual(textAgain, "A")
+        XCTAssertEqual(numberAgain, 1)
+    }
+
+    @MainActor
     func testCacheKeepsTheValueUntilStaleTime() async throws {
         let key = UUID().uuidString
         let calls = CallCount()

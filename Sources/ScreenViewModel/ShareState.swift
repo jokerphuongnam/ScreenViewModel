@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The ViewModel for `id`. A default value creates the instance when this id has none yet.
 /// This screen holds that instance while the screen is alive and releases it when the screen is gone.
-/// The model deinits only after every `shareState` and `@ShareState` screen for this id is gone. The model does not retain the view.
+/// The same id with another model type is another group. The model deinits only after every screen in this group is gone. The model does not retain the view.
 @MainActor
 @propertyWrapper
 public struct ShareState<Action, Model: ScreenModel<Action>>: DynamicProperty {

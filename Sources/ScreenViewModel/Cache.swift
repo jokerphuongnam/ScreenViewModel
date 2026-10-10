@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-/// Runs the call for `key`, or joins the call already running for that key. A fresh cached value is returned without calling `fetch` again.
+/// Runs the call for `key` and this result type, or joins the call already running for that pair. A different result type is a different cache. A fresh cached value is returned without calling `fetch` again.
 /// This is the ViewModel path: call it from `observable` while loading. The result stays cached for `gcTime` after the call returns.
 /// The cache does not retain the view.
 @MainActor

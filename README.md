@@ -63,9 +63,9 @@ A `ScreenModel` still owns its own fields. The app creates the objects below and
 | API | Lifetime | What it is for |
 | --- | --- | --- |
 | `globalState` / `@GlobalState` | From the first `globalState` until the app exits | One ViewModel for that type. A screen reads `@GlobalState`. Dropping a screen does not drop the model. |
-| `shareState` / `@ShareState` | While at least one joined screen is alive | One ViewModel for that id. `shareState(id:_:)` and `@ShareState(id:) = Model()` join the same group. The last screen to disappear releases the model. |
+| `shareState` / `@ShareState` | While at least one joined screen is alive | One ViewModel for that id and model type. The same id with another model type is another group. The last screen of that group releases the model. |
 | `.parentState(_:)` / `@ParentState` | The parent view's model | Like `environmentObject`. Descendants read it. Views outside the modifier do not. Siblings do not see each other's models. |
-| `cache` in a ViewModel | The result stays for `gcTime` after the call | One API call for that key. A ViewModel `await`s it. The same key joins the call already running, and a fresh value does not call again. |
+| `cache` in a ViewModel | The result stays for `gcTime` after the call | One API call for that key and result type. The same key with another result type is another cache. A fresh value does not call again. |
 
 None of these retain the view. A view still disappears as usual. `shareState` and `globalState` only mean that view starts using the model.
 
@@ -120,7 +120,20 @@ case .load:
     }
 ```
 
-Two screens that load the same key share one request. A later load inside `staleTime` gets the cached value and does not call the API. Default `staleTime` is zero. Default `gcTime` is five minutes.
+The cache does not compare the closure. It pairs the string key with the result type.
+
+Same key and same result type are one cache and one in-flight request. A later load inside `staleTime` returns the stored value and does not call again. Default `staleTime` is zero. Default `gcTime` is five minutes.
+
+Same key and a different result type are a second cache. This does not fail, and it does not replace the first cache.
+
+```swift
+let text = try await cache(key: "fact") { "A" } // String cache
+let number = try await cache(key: "fact") { 1 } // Int cache, separate
+```
+
+Two `String` calls need two keys. `cache(key: "fact")` and `cache(key: "title")` stay apart even though both return `String`. Reusing `"fact"` for a second string API reads and writes the fact cache.
+
+`shareState` uses the same rule. The same id and the same model type are one instance. The same id and another model type are another group. `@ShareState(id: "abc")` reads only the type written on the property.
 
 A value that only the view displays uses `cached(key:_:)` or `@CacheState(key:)`. That is not the place for an API call. `cached.data`, `isFetching`, and `refetch()` describe that display value.
 

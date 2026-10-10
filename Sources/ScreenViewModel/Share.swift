@@ -2,7 +2,7 @@ import Foundation
 
 /// Returns the model already registered at `id`, or registers `model` and returns it.
 /// Storing the result, usually in `@State`, is this screen joining the group. The registry does not keep the model alive.
-/// The model is released when every screen that joined with `shareState` or `@ShareState` is gone. It does not retain those views.
+/// The same id with a different model type is a different group. The model is released when every screen in its group is gone. It does not retain those views.
 @MainActor
 @discardableResult
 public func shareState<Action, Model: ScreenModel<Action>>(id: String, _ model: Model) -> Model {
@@ -14,15 +14,15 @@ public func shareState<Action, Model: ScreenModel<Action>>(id: String, _ model: 
 
 @MainActor
 enum ShareRegistry {
-    private static var entries: [String: WeakBox] = [:]
+    private static var entries: [ShareIdentity: WeakBox] = [:]
 
     static func insert<Action, Model: ScreenModel<Action>>(id: String, _ model: Model) -> Model {
-        entries[id] = WeakBox(model)
+        entries[ShareIdentity(id: id, model: ObjectIdentifier(Model.self))] = WeakBox(model)
         return model
     }
 
     static func existing<Action, Model: ScreenModel<Action>>(id: String, as _: Model.Type) -> Model? {
-        entries[id]?.value as? Model
+        entries[ShareIdentity(id: id, model: ObjectIdentifier(Model.self))]?.value as? Model
     }
 
     static func model<Action, Model: ScreenModel<Action>>(id: String) -> Model {
@@ -31,6 +31,11 @@ enum ShareRegistry {
         }
         return model
     }
+}
+
+private struct ShareIdentity: Hashable {
+    let id: String
+    let model: ObjectIdentifier
 }
 
 private final class WeakBox {

@@ -16,6 +16,18 @@ final class ShareStateTests: XCTestCase {
     }
 
     @MainActor
+    func testSameIdWithDifferentModelsAreDifferentGroups() {
+        let parent = shareState(id: "abc", ParentModel())
+        let left = shareState(id: "abc", LeftModel())
+        XCTAssertTrue(shareState(id: "abc", ParentModel()) === parent)
+        XCTAssertTrue(shareState(id: "abc", LeftModel()) === left)
+        let parentReader = ShareState<ProbeAction, ParentModel>(id: "abc")
+        let leftReader = ShareState<ProbeAction, LeftModel>(id: "abc")
+        XCTAssertTrue(parentReader.wrappedValue === parent)
+        XCTAssertTrue(leftReader.wrappedValue === left)
+    }
+
+    @MainActor
     func testSharedModelStaysWhileOneScreenRemains() {
         let id = lifeID()
         let before = LifeModel.alive
