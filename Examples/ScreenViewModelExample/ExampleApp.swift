@@ -97,6 +97,9 @@ struct ExampleApp: App {
                         DemoScreen(model: model)
                     }
                     .buttonStyle(.borderedProminent)
+                    NavigationLink("Open state screen") {
+                        StateScreen()
+                    }
                 }
                 .padding(20)
                 .frame(minWidth: 520, minHeight: 420)
