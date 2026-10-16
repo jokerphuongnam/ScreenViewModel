@@ -39,6 +39,56 @@ final class EffectTests: XCTestCase {
     }
 
     @MainActor
+    func testEffectIdIsGeneratedAndReused() {
+        let model = Probe()
+        var first: EffectID?
+        var second: EffectID?
+        model.effectsByAction[.arm] = .onNext { model.log.append("first") }.id(&first)
+        model.effectsByAction[.reload] = .onNext { model.log.append("second") }.id(&second)
+        let firstID = first
+        model.effectsByAction[.arm] = .onNext { model.log.append("again") }.id(&first)
+
+        XCTAssertNotNil(first)
+        XCTAssertNotNil(second)
+        XCTAssertEqual(first, firstID)
+        XCTAssertNotEqual(first, second)
+
+        model.send(.arm)
+        model.send(.plain)
+        XCTAssertTrue(model.log.isEmpty)
+        model.cancel(first!)
+        XCTAssertEqual(model.log, ["again"])
+        model.cancel(second!)
+        XCTAssertEqual(model.log, ["again"])
+    }
+
+    @MainActor
+    func testGeneratedIdWorksOnEveryEffect() {
+        var taskID: EffectID?
+        var disappearID: EffectID?
+        var redirectID: EffectID?
+        var noneID: EffectID?
+        _ = Effect<ProbeAction>.task(.userInitiated) { _ in }.id(&taskID)
+        _ = Effect<ProbeAction>.onDisappear {}.id(&disappearID)
+        _ = Effect<ProbeAction>.redirect(.plain).id(&redirectID)
+        _ = Effect<ProbeAction>.none.id(&noneID)
+
+        XCTAssertNil(noneID)
+        let ids = [taskID, disappearID, redirectID]
+        XCTAssertEqual(ids.compactMap { $0 }.count, 3)
+        XCTAssertEqual(Set(ids.compactMap { $0 }).count, 3)
+
+        let model = Probe()
+        model.effectsByAction[.addTwo] = .redirect(.addOne).id(&redirectID)
+        model.effectsByAction[.addOne] = .onNext { model.log.append("cleaned") }
+        model.send(.addTwo)
+        model.send(.plain)
+        XCTAssertTrue(model.log.isEmpty)
+        model.cancel(redirectID!)
+        XCTAssertEqual(model.log, ["cleaned"])
+    }
+
+    @MainActor
     func testNamedOnNextStaysUntilThatIdIsCancelled() {
         let model = Probe()
         model.effectsByAction[.arm] = .onNext(id: "clock") { model.log.append("cleaned") }

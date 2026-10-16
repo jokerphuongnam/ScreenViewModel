@@ -85,13 +85,13 @@ open class ScreenModel<Action>: ViewModel {
         switch effect {
         case .none:
             return nil
-        case .redirect(let action):
+        case .redirect(let action, let redirectID):
             guard depth < 16 else { return nil }
             effects.fireAnonymousOnNext()
             let next = EffectTicket()
             let followed = observable(action: action, cancel: Cancel(ticket: next, effects: effects))
             guard !next.cancelled else { return nil }
-            return apply(followed, ticket: next, forcedID: forcedID, depth: depth + 1)
+            return apply(followed, ticket: next, forcedID: redirectID ?? forcedID, depth: depth + 1)
         case .onNext(let id, let cleanup):
             effects.store(ticket: ticket, id: forcedID?.raw ?? id, onNext: cleanup)
             return ticket

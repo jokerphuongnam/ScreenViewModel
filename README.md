@@ -5,14 +5,14 @@ A small view-model loop for a SwiftUI screen. The view calls `send`. The screen 
 Platforms: macOS 14, iOS 17, watchOS 10, tvOS 17, and visionOS 1. The screen loop uses Foundation and Observation. Parent, global, and share injection use SwiftUI. There is no AppKit or UIKit dependency.
 
 ```swift
-.package(url: "https://github.com/jokerphuongnam/ScreenViewModel", from: "1.5.1")
+.package(url: "https://github.com/jokerphuongnam/ScreenViewModel", from: "2.0.0")
 ```
 
 ```swift
 import ScreenViewModel
 ```
 
-`1.5.1` is the current stable release. `1.0.0` is the first stable API. Tags named `0.x.x-betaXX` are pre-release and are not a stable API. Version numbers follow [Semantic Versioning](https://semver.org/): the third number is a small backward compatible fix, the second number adds backward compatible API, and the first number changes only when existing API breaks. Nothing since `1.0.0` breaks that API, so `from: "1.0.0"` accepts every release below.
+`2.0.0` is the current stable release. `1.0.0` is the first stable API. Tags named `0.x.x-betaXX` are pre-release and are not a stable API. Version numbers follow [Semantic Versioning](https://semver.org/): the third number is a small backward compatible fix, the second number adds backward compatible API, and the first number changes only when existing API breaks. `from: "1.0.0"` accepts every `1.x` release. `2.0.0` adds `.id(&)` and gives `.redirect` an id, so a `switch` that matched `.redirect(let action)` must match the id as well. `.redirect(action)` still builds.
 
 ## Use it
 
@@ -53,6 +53,16 @@ var body: some View {
 ```
 
 `model.send(.load, id: &loadID)` writes a new `EffectID` into `loadID` when it is nil, then stores the effect under that id. The same variable reuses the id. Cancel it with `model.cancel(loadID!)`.
+
+An effect gets its id the same way. The id is generated. Do not pass a string or other hand-made value, because two of those can collide.
+
+```swift
+var onNextID: EffectID?
+
+return .onNext { save() }.id(&onNextID)
+```
+
+`onNextID` then holds that generated id. `model.cancel(onNextID!)` cancels it. The same `.id(&id)` works on `.onDisappear` and `.task`. `.redirect(.next).id(&id)` stores the next action the way `send(next, id: &id)` does, and `cancel` uses that id. `.none` stores nothing, so it has no id.
 
 An enum case can be sent through the subscript. `model[.load]()` sends `.load`. `model[.load].id(&loadID)` and `model[.load]().id(&loadID)` store that effect under the id.
 
@@ -146,7 +156,7 @@ The macOS example's state screen is `Examples/ScreenViewModelExample/StateExampl
 | Case | What it does |
 | --- | --- |
 | `.none` | Stores nothing. Does not clear an `onDisappear` that is already stored, and does not cancel a running `.task`. |
-| `.redirect(action)` | Runs that action next. Depth is capped at 16 extra steps. An action that always redirects to itself is observed 17 times. |
+| `.redirect(action)` | Runs that action next. Depth is capped at 16 extra steps. An action that always redirects to itself is observed 17 times. `.redirect(action).id(&id)` stores that next effect the way `send(action, id: &id)` does. |
 | `.onNext` | Without an id, runs at the start of the next `send`, and also when the model is released. With an id, waits until `cancel(id)` or `disappear()`. |
 | `.onDisappear` | Without an id, runs once from `disappear()`. With an id, `cancel(id)` runs it early. |
 | `.task` | Async work, like SwiftUI `.task`. The closure receives `send` and must change state by sending an action. Default priority is `.userInitiated`. |
@@ -188,3 +198,4 @@ Tests live in `Sources/Tests`. Run them with `swift test`.
 | `1.4.1` | Docs and the state example |
 | `1.5.0` | The same cache key with another result type is another cache. The same share id with another model type is another group |
 | `1.5.1` | This version list |
+| `2.0.0` | `.id(&)` generates an id for `.onNext`, `.onDisappear`, `.task`, and the action `.redirect` runs next. `.none` has no id. A switch on `.redirect` now includes that id |
