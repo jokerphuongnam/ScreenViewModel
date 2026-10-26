@@ -29,9 +29,9 @@ public func cache<Value>(
         return fresh
     }
     let value = fetch()
-    onMain({
+    onMain {
         CacheRegistry.store(key: key, value: value, staleTime: staleTime, gcTime: gcTime)
-    })
+    }
     return value
 }
 
