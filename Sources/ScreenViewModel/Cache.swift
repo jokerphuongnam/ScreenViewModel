@@ -23,9 +23,10 @@ public func cache<Value>(
     gcTime: Duration = .seconds(5 * 60),
     _ fetch: () -> Value
 ) -> Value {
-    if let fresh = onMain {
+    let fresh = onMain {
         CacheRegistry.fresh(key: key, staleTime: staleTime, gcTime: gcTime, as: Value.self)
-    } {
+    }
+    if let fresh {
         return fresh
     }
     let value = fetch()
