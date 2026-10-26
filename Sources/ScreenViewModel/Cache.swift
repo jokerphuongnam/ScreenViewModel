@@ -18,14 +18,22 @@ public func cache<Value>(
 
 /// The view path. Same key and value type as `cache`, for a value that only the view displays.
 /// The returned object is one observer. It does not retain the view.
-@MainActor
 public func cached<Value>(
     key: String,
     staleTime: Duration = .zero,
     gcTime: Duration = .seconds(5 * 60),
     _ fetch: @escaping @Sendable () async throws -> Value
 ) -> Cached<Value> {
-    CacheRegistry.lease(key: key, staleTime: staleTime, gcTime: gcTime, fetch: fetch)
+    if Thread.isMainThread {
+        return MainActor.assumeIsolated {
+            CacheRegistry.lease(key: key, staleTime: staleTime, gcTime: gcTime, fetch: fetch)
+        }
+    }
+    return DispatchQueue.main.sync {
+        MainActor.assumeIsolated {
+            CacheRegistry.lease(key: key, staleTime: staleTime, gcTime: gcTime, fetch: fetch)
+        }
+    }
 }
 
 /// The shared result of a `cache(key:_:)` query. `data`, `error`, and `isFetching` update every view that reads them.
