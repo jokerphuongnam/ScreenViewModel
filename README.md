@@ -12,7 +12,7 @@ Platforms: macOS 14, iOS 17, watchOS 10, tvOS 17, and visionOS 1. The screen loo
 import ScreenViewModel
 ```
 
-`2.0.2` is the current stable release. `1.0.0` is the first stable API. Tags named `0.x.x-betaXX` are pre-release and are not a stable API. Version numbers follow [Semantic Versioning](https://semver.org/): the third number is a small backward compatible fix, the second number adds backward compatible API, and the first number changes only when existing API breaks. `from: "1.0.0"` accepts every `1.x` release. `2.0.0` adds `.id(&)` and gives `.redirect` an id, so a `switch` that matched `.redirect(let action)` must match the id as well. `.redirect(action)` still builds.
+`2.0.0` is the current stable release. `1.0.0` is the first stable API. Tags named `0.x.x-betaXX` are pre-release and are not a stable API. Version numbers follow [Semantic Versioning](https://semver.org/): the third number is a small backward compatible fix, the second number adds backward compatible API, and the first number changes only when existing API breaks. `from: "1.0.0"` accepts every `1.x` release. `2.0.0` adds `.id(&)` and gives `.redirect` an id, so a `switch` that matched `.redirect(let action)` must match the id as well. `.redirect(action)` still builds.
 
 ## Use it
 
@@ -198,6 +198,4 @@ Tests live in `Sources/Tests`. Run them with `swift test`.
 | `1.4.1` | Docs and the state example |
 | `1.5.0` | The same cache key with another result type is another cache. The same share id with another model type is another group |
 | `1.5.1` | This version list |
-| `2.0.0` | `.id(&)` generates an id for `.onNext`, `.onDisappear`, `.task`, and the action `.redirect` runs next. `.none` has no id. A switch on `.redirect` now includes that id |
-| `2.0.1` | `cached(key:)` can be called off the main actor. The registry still runs on the main actor |
-| `2.0.2` | `cache(key:)` has a synchronous overload. The fetch runs on the caller. A fresh value is returned without calling it again |
+| `2.0.0` | `.id(&)` generates an id for `.onNext`, `.onDisappear`, `.task`, and the action `.redirect` runs next. `.none` has no id. A switch on `.redirect` now includes that id. `cached(key:)` can be called off the main actor. `cache(key:)` also has a synchronous overload whose fetch runs on the caller |
