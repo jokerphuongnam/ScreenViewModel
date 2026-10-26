@@ -16,6 +16,34 @@ public func cache<Value>(
     return try await cached.load()
 }
 
+/// Synchronous call. A fresh value for `key` is returned without running `fetch`. `fetch` runs on the caller.
+public func cache<Value>(
+    key: String,
+    staleTime: Duration = .zero,
+    gcTime: Duration = .seconds(5 * 60),
+    _ fetch: () -> Value
+) -> Value {
+    if let fresh = onMain({
+        CacheRegistry.fresh(key: key, staleTime: staleTime, gcTime: gcTime, as: Value.self)
+    }) {
+        return fresh
+    }
+    let value = fetch()
+    onMain({
+        CacheRegistry.store(key: key, value: value, staleTime: staleTime, gcTime: gcTime)
+    })
+    return value
+}
+
+private func onMain<T>(_ body: @MainActor () -> T) -> T {
+    if Thread.isMainThread {
+        return MainActor.assumeIsolated(body)
+    }
+    return DispatchQueue.main.sync {
+        MainActor.assumeIsolated(body)
+    }
+}
+
 /// The view path. Same key and value type as `cache`, for a value that only the view displays.
 /// The returned object is one observer. It does not retain the view.
 public func cached<Value>(
@@ -141,6 +169,43 @@ enum CacheRegistry {
         return Cached(entry: entry)
     }
 
+    static func fresh<Value>(
+        key: String,
+        staleTime: Duration,
+        gcTime: Duration,
+        as _: Value.Type
+    ) -> Value? {
+        let identity = CacheIdentity(key: key, value: ObjectIdentifier(Value.self))
+        guard let entry = entries[identity] as? CacheEntry<Value> else { return nil }
+        entry.staleTime = staleTime
+        entry.gcTime = gcTime
+        return entry.freshValue()
+    }
+
+    static func store<Value>(
+        key: String,
+        value: Value,
+        staleTime: Duration,
+        gcTime: Duration
+    ) {
+        let identity = CacheIdentity(key: key, value: ObjectIdentifier(Value.self))
+        let entry: CacheEntry<Value>
+        if let existing = entries[identity] as? CacheEntry<Value> {
+            existing.staleTime = staleTime
+            existing.gcTime = gcTime
+            entry = existing
+        } else {
+            entry = CacheEntry(
+                identity: identity,
+                fetch: { value },
+                staleTime: staleTime,
+                gcTime: gcTime
+            )
+            entries[identity] = entry
+        }
+        entry.remember(value)
+    }
+
     static func remove(_ identity: CacheIdentity, entry: AnyObject) {
         guard entries[identity] === entry else { return }
         entries[identity] = nil
@@ -200,6 +265,25 @@ final class CacheEntry<Value> {
         }
     }
 
+    func freshValue() -> Value? {
+        guard let data = record.data, !isStale else { return nil }
+        return data
+    }
+
+    func remember(_ value: Value) {
+        record.data = value
+        record.error = nil
+        record.status = .success
+        record.isFetching = false
+        updatedAt = CacheClock.now()
+        guard observers == 0 else { return }
+        if gcTime == .zero {
+            evict()
+            return
+        }
+        scheduleCollection()
+    }
+
     func load() async throws -> Value {
         if let data = record.data, !isStale {
             return data
@@ -214,7 +298,12 @@ final class CacheEntry<Value> {
             evict()
             return
         }
+        scheduleCollection()
+    }
+
+    private func scheduleCollection() {
         let wait = gcTime
+        collect?.cancel()
         collect = Task { @MainActor in
             try? await Task.sleep(for: wait)
             guard !Task.isCancelled, self.observers == 0 else { return }
