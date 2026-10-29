@@ -3,7 +3,7 @@ import Observation
 
 @MainActor
 @Observable
-open class ScreenModel<Action>: ViewModel {
+open class ScreenModel<Action>: ScreenModelProtocol {
     private let effects = ViewModelEffects()
 
     public init() {}

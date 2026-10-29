@@ -17,6 +17,8 @@ public func cache<Value>(
 }
 
 /// Synchronous call. A fresh value for `key` is returned without running `fetch`. `fetch` runs on the caller.
+/// Disfavored so a closure in an async context picks the async overload (Swift 6.4 reports them as ambiguous otherwise).
+@_disfavoredOverload
 public func cache<Value>(
     key: String,
     staleTime: Duration = .zero,

@@ -16,19 +16,30 @@ public func globalState<Action, Model: ScreenModel<Action>>(_ model: Model) -> M
 enum GlobalRegistry {
     private static var entries: [ObjectIdentifier: AnyObject] = [:]
 
-    static func insert<Action, Model: ScreenModel<Action>>(_ model: Model) -> Model {
+    static func insert<Model: AnyObject>(_ model: Model) -> Model {
         entries[ObjectIdentifier(Model.self)] = model
         return model
     }
 
-    static func existing<Action, Model: ScreenModel<Action>>(as _: Model.Type) -> Model? {
+    static func existing<Model: AnyObject>(as _: Model.Type) -> Model? {
         entries[ObjectIdentifier(Model.self)] as? Model
     }
 
-    static func model<Action, Model: ScreenModel<Action>>(as _: Model.Type) -> Model {
+    static func model<Model: AnyObject>(as _: Model.Type) -> Model {
         guard let model = existing(as: Model.self) else {
             fatalError("No \(Model.self) global. Create it with globalState(_:).")
         }
         return model
     }
+}
+
+/// Returns the app-wide `ViewModel` for this screen, or registers `model` and returns it. Same lifetime as `globalState` for `ScreenModel`.
+/// The context autoclosure of a dropped duplicate never runs.
+@MainActor
+@discardableResult
+public func globalState<Screen: ScreenContext>(_ model: @autoclosure () -> ViewModel<Screen>) -> ViewModel<Screen> {
+    if let existing = GlobalRegistry.existing(as: ViewModel<Screen>.self) {
+        return existing
+    }
+    return GlobalRegistry.insert(model())
 }

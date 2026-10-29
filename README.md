@@ -199,3 +199,53 @@ Tests live in `Sources/Tests`. Run them with `swift test`.
 | `1.5.0` | The same cache key with another result type is another cache. The same share id with another model type is another group |
 | `1.5.1` | This version list |
 | `2.0.0` | `.id(&)` generates an id for `.onNext`, `.onDisappear`, `.task`, and the action `.redirect` runs next. `.none` has no id. A switch on `.redirect` now includes that id. `cached(key:)` can be called off the main actor. `cache(key:)` also has a synchronous overload whose fetch runs on the caller |
+
+## Context ViewModel (2.1)
+
+A newer API that sits alongside `ScreenModel`, which stays unchanged.
+
+```swift
+enum Counter: ScreenContext {
+    struct State: DefaultScreenState, Equatable { var count = 0; var name = "" }  // plain value
+    enum Action { case increment, load(id: Int), loaded(String) }
+}
+
+final class CounterLogic: ViewModelContext<Counter> {
+    let service: CounterService
+    init(service: CounterService = .live) { self.service = service }
+
+    override func observable(action: Counter.Action, state: inout Counter.State, cancel: EffectCancel) -> ActionEffect<Counter.Action> {
+        switch action {
+        case .increment: state.count += 1; return .none
+        case .load(let id):
+            return .task(id: "load") { send in send(.loaded(await self.service.fetch(id))) }
+        case .loaded(let name): state.name = name; return .none
+        }
+    }
+}
+
+struct CounterView: View {
+    @State var model = ViewModel(context: CounterLogic())   // the context is built only once, on first use
+    var body: some View {
+        Button("\(model.count)") { model.send(.increment) }  // outside code sees State fields and send() only
+    }
+}
+```
+
+- `State` is a plain struct. Observation lives on `ViewModelContext` (which is `@Observable` and stores `state`) and on `ViewModel`. Each `send` writes the new value back once; if `State` is `Equatable`, an unchanged state notifies no one. Views re-render when the state changes, not per field.
+- Two-way binding works like a normal `@Observable` model: `TextField("Name", text: $model.name)` with `@State var model` or `@Bindable var model`. A write updates `State` on the context, which refreshes every view reading it. Then `ViewModelContext.binding(changed:state:cancel:)` runs, so you can validate the value or return an effect:
+  ```swift
+  override func binding(changed keyPath: PartialKeyPath<Counter.State>, state: inout Counter.State, cancel: EffectCancel) -> ActionEffect<Counter.Action> {
+      if keyPath == \Counter.State.name { return .task(id: "search") { send in /* debounce, fetch */ } }
+      return .none
+  }
+  ```
+  `model.binding(\.name, send: { .setName($0) })` is still there when an edit should become an Action instead.
+- `ActionEffect`: `.none`, `.send`, `.task(priority:id:)` (running a task with the same id replaces the old one), `.cancel(id:)`, `.onDisappear`, `.merge`. All tasks are cancelled when the ViewModel is released.
+- Testing: `let vm = ViewModel(context: CounterLogic(service: .fake))`, then `vm.send(.increment)`, then `XCTAssertEqual(vm.count, 1)`.
+- Lifecycle with the new ViewModel:
+  - `globalState { ViewModel(context: …) }` / `@GlobalViewModel`
+  - `shareState(id:) { … }` / `@ShareViewModel(id:)`
+  - `.parentState(model)` / `@ParentState var parent: ViewModel<Parent>`
+  - `cache(key:)` works inside `.task`
+- Source break: the old `protocol ViewModel` is now `ScreenModelProtocol`, because the name is taken by the new class.
