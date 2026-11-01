@@ -184,7 +184,7 @@ struct CounterOwnerView: View {
 }
 
 struct CounterEditorView: View {
-    @Bindable var model: ViewModel<CounterScreen>
+    @Bindable var model: ViewModel<CounterScreen, ViewState>
     var body: some View {
         TextField("Name", text: $model.name)
     }

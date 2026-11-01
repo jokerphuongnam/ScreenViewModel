@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 import SwiftUI
 @testable import ScreenViewModel
 
@@ -28,94 +29,94 @@ final class GapModel: ScreenModel<GapAction> {
 
 @MainActor final class SilentModel: ScreenModel<GapAction> {}
 
-final class ScreenModelGapTests: XCTestCase {
+@Suite(.serialized) final class ScreenModelGapTests {
     @MainActor
-    func testCancelTicketForStoredAnonymousOnDisappearAndTask() async {
+    @Test func testCancelTicketForStoredAnonymousOnDisappearAndTask() async {
         let model = GapModel()
         model.send(.watch)
         model.send(.work)
         model.cancels[.watch]!()
-        XCTAssertEqual(model.log, ["gone"])
+        #expect(model.log == ["gone"])
         model.cancels[.work]!()
         await waitUntil { model.log.contains("work cancelled") }
-        XCTAssertEqual(model.log, ["gone", "work cancelled"])
+        #expect(model.log == ["gone", "work cancelled"])
     }
 
     @MainActor
-    func testCancelByIdThroughCancelHandle() {
+    @Test func testCancelByIdThroughCancelHandle() {
         let model = GapModel()
         model.send(.keep)
         model.cancels[.keep]!("keep")
-        XCTAssertEqual(model.log, ["keep next"])
+        #expect(model.log == ["keep next"])
     }
 
     @MainActor
-    func testRekeyAfterSendMovesAnonymousOnDisappear() {
+    @Test func testRekeyAfterSendMovesAnonymousOnDisappear() {
         let model = GapModel()
         var id: EffectID?
         model[.watch]().id(&id)
-        XCTAssertNotNil(id)
+        #expect(id != nil)
         model.cancel(id!)
-        XCTAssertEqual(model.log, ["gone"])
+        #expect(model.log == ["gone"])
     }
 
     @MainActor
-    func testRekeyAfterSendMovesAnonymousTask() async {
+    @Test func testRekeyAfterSendMovesAnonymousTask() async {
         let model = GapModel()
         var id: EffectID?
         model[.work]().id(&id)
         model.cancel(id!)
         await waitUntil { model.log == ["work cancelled"] }
-        XCTAssertEqual(model.log, ["work cancelled"])
+        #expect(model.log == ["work cancelled"])
     }
 
     @MainActor
-    func testRekeyMovesANamedEffectAndReplacesTheTarget() {
+    @Test func testRekeyMovesANamedEffectAndReplacesTheTarget() {
         let model = GapModel()
         var target: EffectID? = EffectID("target")
         model.send(.watch, id: &target)                 // something already stored at the target id
         let call = model[.keep]()                       // stored under "keep"
         call.id(&target)                                // move it to "target"; the old target finishes
-        XCTAssertEqual(model.log, ["gone"])
+        #expect(model.log == ["gone"])
         call.id(&target)                                // same key again: no-op
         model.cancel(target!)
-        XCTAssertEqual(model.log, ["gone", "keep next"])
+        #expect(model.log == ["gone", "keep next"])
         let plain = model[.plain]()
         var none: EffectID?
         plain.id(&none)                                 // nothing stored for this ticket: no-op
-        XCTAssertEqual(model.log, ["gone", "keep next"])
+        #expect(model.log == ["gone", "keep next"])
     }
 
     @MainActor
-    func testSendIdentifiedActionAndEffectIDFromValue() {
+    @Test func testSendIdentifiedActionAndEffectIDFromValue() {
         let model = GapModel()
         let id = EffectID("custom")
-        XCTAssertEqual(id, EffectID("custom"))
+        #expect(id == EffectID("custom"))
         model.send(IdentifiedAction(action: .watch, id: id))
         model.cancel(id)
-        XCTAssertEqual(model.log, ["gone"])
+        #expect(model.log == ["gone"])
     }
 
     @MainActor
-    func testDefaultObservableDoesNothing() {
+    @Test func testDefaultObservableDoesNothing() {
         let model = SilentModel()
         model.send(.watch)
         model.disappear()
     }
 
     @MainActor
-    func testCancelTicketRunsAnonymousOnNextAndNamedEffect() {
+    @Test func testCancelTicketRunsAnonymousOnNextAndNamedEffect() {
         let model = GapModel()
         model.send(.next)
         model.cancels[.next]!()
-        XCTAssertEqual(model.log, ["next ran"])
+        #expect(model.log == ["next ran"])
         model.send(.keep)
         model.cancels[.keep]!()
-        XCTAssertEqual(model.log, ["next ran", "keep next"])
+        #expect(model.log == ["next ran", "keep next"])
     }
 
     @MainActor
-    func testScreenModelReleasedOffMainCleansUpOnMain() async {
+    @Test func testScreenModelReleasedOffMainCleansUpOnMain() async {
         final class Box: @unchecked Sendable { var model: Probe? }
         let ran = Flag()
         let box = Box()
@@ -124,74 +125,74 @@ final class ScreenModelGapTests: XCTestCase {
         box.model?.send(.arm)
         await Task.detached { box.model = nil }.value   // last reference dropped on a background thread
         await waitUntil { ran.value }
-        XCTAssertTrue(ran.value)
+        #expect(ran.value)
     }
 }
 
 // MARK: - Cache paths
 
-final class CacheGapTests: XCTestCase {
-    override func tearDown() { CacheClock.now = { Date() }; super.tearDown() }
+@Suite(.serialized) final class CacheGapTests {
+    deinit { CacheClock.now = { Date() } }
 
     @MainActor
-    func testSyncCacheStoresThenReturnsFresh() {
+    @Test func testSyncCacheStoresThenReturnsFresh() {
         let key = UUID().uuidString
         var calls = 0
         let first: String = cache(key: key, staleTime: .seconds(60)) { calls += 1; return "A" }
         let second: String = cache(key: key, staleTime: .seconds(60)) { calls += 1; return "B" }
-        XCTAssertEqual([first, second], ["A", "A"])
-        XCTAssertEqual(calls, 1)
+        #expect([first, second] == ["A", "A"])
+        #expect(calls == 1)
     }
 
     @MainActor
-    func testSyncCacheRefetchesWhenStaleAndUpdatesTheEntry() {
+    @Test func testSyncCacheRefetchesWhenStaleAndUpdatesTheEntry() {
         let key = UUID().uuidString
         let start = Date(timeIntervalSince1970: 1_700_000_000)
         CacheClock.now = { start }
         let a: Int = cache(key: key, staleTime: .seconds(10)) { 1 }
         CacheClock.now = { start.addingTimeInterval(11) }
         let b: Int = cache(key: key, staleTime: .seconds(10)) { 2 }
-        XCTAssertEqual([a, b], [1, 2])
+        #expect([a, b] == [1, 2] as [Int])
     }
 
     @MainActor
-    func testSyncCacheWithZeroGcTimeEvicts() {
+    @Test func testSyncCacheWithZeroGcTimeEvicts() {
         let key = UUID().uuidString
         let a: Int = cache(key: key, staleTime: .seconds(60), gcTime: .zero) { 1 }
         let b: Int = cache(key: key, staleTime: .seconds(60), gcTime: .zero) { 2 }
-        XCTAssertEqual([a, b], [1, 2])
+        #expect([a, b] == [1, 2] as [Int])
     }
 
     @MainActor
-    func testSyncCacheAndCachedFromABackgroundThread() async {
+    @Test func testSyncCacheAndCachedFromABackgroundThread() async {
         let key = UUID().uuidString
         let result = await Task.detached { () -> (Int, Int) in
             let a: Int = cache(key: key, staleTime: .seconds(60)) { 7 }
             let b: Int = cache(key: key, staleTime: .seconds(60)) { 8 }
             return (a, b)
         }.value
-        XCTAssertEqual(result.0, 7)
-        XCTAssertEqual(result.1, 7)
+        #expect(result.0 == 7)
+        #expect(result.1 == 7)
 
         final class Box: @unchecked Sendable { var cached: Cached<String>? }
         let box = Box()
         let ckey = UUID().uuidString
         await Task.detached { box.cached = cached(key: ckey, staleTime: .seconds(60)) { "bg" } }.value
         await waitUntil { box.cached?.data == "bg" }
-        XCTAssertEqual(box.cached?.data, "bg")
+        #expect(box.cached?.data == "bg")
         await Task.detached { box.cached = nil }.value   // observer released off main
         try? await Task.sleep(for: .milliseconds(50))
     }
 
     @MainActor
-    func testCacheStateHoldsItsObserver() async {
+    @Test func testCacheStateHoldsItsObserver() async {
         let key = UUID().uuidString
         let seed = cached(key: key, staleTime: .seconds(60)) { 5 }
         await waitUntil { seed.data == 5 }
         let state = CacheState<Int>(key: key)
         let first = state.wrappedValue
-        XCTAssertTrue(state.wrappedValue === first)
-        XCTAssertEqual(first.data, 5)
+        #expect(state.wrappedValue === first)
+        #expect(first.data == 5)
     }
 }
 
@@ -202,7 +203,7 @@ final class CacheGapTests: XCTestCase {
 
 struct ParentStateChild: View {
     @ParentState var parent: ParentProbe
-    @ParentState var screen: ViewModel<CounterScreen>
+    @ParentState var screen: ViewModel<CounterScreen, ViewState>
     var body: some View {
         let _ = parentSeen.append("\(parent.title) count=\(screen.count)")
         Text(parent.title)
@@ -211,7 +212,7 @@ struct ParentStateChild: View {
 
 struct ParentStateRoot: View {
     let parent: ParentProbe
-    let screen: ViewModel<CounterScreen>
+    let screen: ViewModel<CounterScreen, ViewState>
     var body: some View {
         ParentStateChild()
             .parentState(parent)
@@ -219,9 +220,9 @@ struct ParentStateRoot: View {
     }
 }
 
-final class SwiftUIHostTests: XCTestCase {
+@Suite(.serialized) final class SwiftUIHostTests {
     @MainActor
-    func testParentStateReadsModelsProvidedAboveInARealHostingView() {
+    @Test func testParentStateReadsModelsProvidedAboveInARealHostingView() {
         parentSeen = []
         let parent = ParentProbe()
         let screen = ViewModel(context: CounterLogic(tracker: Tracker()))
@@ -232,21 +233,21 @@ final class SwiftUIHostTests: XCTestCase {
             window.contentView = host
             host.layoutSubtreeIfNeeded()
             RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-            XCTAssertEqual(parentSeen.last, "parent count=0")
+            #expect(parentSeen.last == "parent count=0")
             parent.title = "changed"
             screen.send(.increment)
             RunLoop.main.run(until: Date().addingTimeInterval(0.2))
             host.layoutSubtreeIfNeeded()
-            XCTAssertEqual(parentSeen.last, "changed count=1")
+            #expect(parentSeen.last == "changed count=1")
             window.contentView = nil
         }
     }
 
     @MainActor
-    func testScreenScopeEnvironmentRoundTrips() {
+    @Test func testScreenScopeEnvironmentRoundTrips() {
         var env = EnvironmentValues()
         let parent = ParentProbe()
         env.screenScope = env.screenScope.setting(parent)
-        XCTAssertTrue(env.screenScope.model(ParentProbe.self) === parent)
+        #expect(env.screenScope.model(ParentProbe.self) === parent)
     }
 }

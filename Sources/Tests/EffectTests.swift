@@ -1,45 +1,46 @@
-import XCTest
+import Foundation
+import Testing
 @testable import ScreenViewModel
 
-final class EffectTests: XCTestCase {
+@Suite(.serialized) final class EffectTests {
     @MainActor
-    func testNoneDoesNothing() {
+    @Test func testNoneDoesNothing() {
         let model = Probe()
         model.send(.plain)
-        XCTAssertEqual(model.seen, [.plain])
-        XCTAssertTrue(model.log.isEmpty)
+        #expect(model.seen == [.plain])
+        #expect(model.log.isEmpty)
     }
 
     @MainActor
-    func testRedirectRunsTheNextAction() {
+    @Test func testRedirectRunsTheNextAction() {
         let model = Probe()
         model.effectsByAction[.addTwo] = .redirect(.addOneThenOne)
         model.effectsByAction[.addOneThenOne] = .redirect(.addOne)
         model.send(.addTwo)
-        XCTAssertEqual(model.seen, [.addTwo, .addOneThenOne, .addOne])
+        #expect(model.seen == [.addTwo, .addOneThenOne, .addOne])
     }
 
     @MainActor
-    func testRedirectStopsAfterSixteenSteps() {
+    @Test func testRedirectStopsAfterSixteenSteps() {
         let model = Probe()
         model.effectsByAction[.loop] = .redirect(.loop)
         model.send(.loop)
-        XCTAssertEqual(model.seen.count, 17)
+        #expect(model.seen.count == 17)
     }
 
     @MainActor
-    func testAnonymousOnNextRunsBeforeTheFollowingAction() {
+    @Test func testAnonymousOnNextRunsBeforeTheFollowingAction() {
         let model = Probe()
         model.effectsByAction[.arm] = .onNext { model.log.append("cleaned") }
         model.send(.arm)
-        XCTAssertTrue(model.log.isEmpty)
+        #expect(model.log.isEmpty)
         model.send(.plain)
-        XCTAssertEqual(model.log, ["cleaned"])
-        XCTAssertEqual(model.seen, [.arm, .plain])
+        #expect(model.log == ["cleaned"])
+        #expect(model.seen == [.arm, .plain])
     }
 
     @MainActor
-    func testEffectIdIsGeneratedAndReused() {
+    @Test func testEffectIdIsGeneratedAndReused() {
         let model = Probe()
         var first: EffectID?
         var second: EffectID?
@@ -48,22 +49,22 @@ final class EffectTests: XCTestCase {
         let firstID = first
         model.effectsByAction[.arm] = .onNext { model.log.append("again") }.id(&first)
 
-        XCTAssertNotNil(first)
-        XCTAssertNotNil(second)
-        XCTAssertEqual(first, firstID)
-        XCTAssertNotEqual(first, second)
+        #expect(first != nil)
+        #expect(second != nil)
+        #expect(first == firstID)
+        #expect(first != second)
 
         model.send(.arm)
         model.send(.plain)
-        XCTAssertTrue(model.log.isEmpty)
+        #expect(model.log.isEmpty)
         model.cancel(first!)
-        XCTAssertEqual(model.log, ["again"])
+        #expect(model.log == ["again"])
         model.cancel(second!)
-        XCTAssertEqual(model.log, ["again"])
+        #expect(model.log == ["again"])
     }
 
     @MainActor
-    func testGeneratedIdWorksOnEveryEffect() {
+    @Test func testGeneratedIdWorksOnEveryEffect() {
         var taskID: EffectID?
         var disappearID: EffectID?
         var redirectID: EffectID?
@@ -73,56 +74,56 @@ final class EffectTests: XCTestCase {
         _ = Effect<ProbeAction>.redirect(.plain).id(&redirectID)
         _ = Effect<ProbeAction>.none.id(&noneID)
 
-        XCTAssertNil(noneID)
+        #expect(noneID == nil)
         let ids = [taskID, disappearID, redirectID]
-        XCTAssertEqual(ids.compactMap { $0 }.count, 3)
-        XCTAssertEqual(Set(ids.compactMap { $0 }).count, 3)
+        #expect(ids.compactMap { $0 }.count == 3)
+        #expect(Set(ids.compactMap { $0 }).count == 3)
 
         let model = Probe()
         model.effectsByAction[.addTwo] = .redirect(.addOne).id(&redirectID)
         model.effectsByAction[.addOne] = .onNext { model.log.append("cleaned") }
         model.send(.addTwo)
         model.send(.plain)
-        XCTAssertTrue(model.log.isEmpty)
+        #expect(model.log.isEmpty)
         model.cancel(redirectID!)
-        XCTAssertEqual(model.log, ["cleaned"])
+        #expect(model.log == ["cleaned"])
     }
 
     @MainActor
-    func testNamedOnNextStaysUntilThatIdIsCancelled() {
+    @Test func testNamedOnNextStaysUntilThatIdIsCancelled() {
         let model = Probe()
         model.effectsByAction[.arm] = .onNext(id: "clock") { model.log.append("cleaned") }
         model.send(.arm)
         model.send(.plain)
-        XCTAssertTrue(model.log.isEmpty)
+        #expect(model.log.isEmpty)
         model.cancel("clock")
-        XCTAssertEqual(model.log, ["cleaned"])
+        #expect(model.log == ["cleaned"])
     }
 
     @MainActor
-    func testNoneDoesNotClearOnDisappear() {
+    @Test func testNoneDoesNotClearOnDisappear() {
         let model = Probe()
         model.effectsByAction[.appear] = .onDisappear { model.log.append("gone") }
         model.send(.appear)
         model.send(.plain)
-        XCTAssertTrue(model.log.isEmpty)
+        #expect(model.log.isEmpty)
         model.disappear()
-        XCTAssertEqual(model.log, ["gone"])
+        #expect(model.log == ["gone"])
     }
 
     @MainActor
-    func testOnDisappearWithIdCanBeCancelledEarly() {
+    @Test func testOnDisappearWithIdCanBeCancelledEarly() {
         let model = Probe()
         model.effectsByAction[.appear] = .onDisappear(id: "watch") { model.log.append("gone") }
         model.send(.appear)
         model.cancel("watch")
-        XCTAssertEqual(model.log, ["gone"])
+        #expect(model.log == ["gone"])
         model.disappear()
-        XCTAssertEqual(model.log, ["gone"])
+        #expect(model.log == ["gone"])
     }
 
     @MainActor
-    func testTaskSendsItsResult() {
+    @Test func testTaskSendsItsResult() async {
         let model = Probe()
         let done = expectation(description: "loaded")
         model.effectsByAction[.load] = .task(.userInitiated) { send in
@@ -132,11 +133,11 @@ final class EffectTests: XCTestCase {
             if case .loaded(1) = action { done.fulfill() }
         }
         model.send(.load)
-        wait(for: [done], timeout: 1)
+        await wait(for: [done], timeout: 1)
     }
 
     @MainActor
-    func testNewAnonymousTaskCancelsThePreviousOne() {
+    @Test func testNewAnonymousTaskCancelsThePreviousOne() async {
         let model = Probe()
         let firstStarted = expectation(description: "first")
         let secondFinished = expectation(description: "second")
@@ -154,18 +155,18 @@ final class EffectTests: XCTestCase {
             }
         }
         model.send(.load)
-        wait(for: [firstStarted], timeout: 1)
+        await wait(for: [firstStarted], timeout: 1)
         model.onEvent = { action in
             if case .loaded(2) = action { secondFinished.fulfill() }
         }
         model.send(.load)
         releaseFirst?.resume()
-        wait(for: [secondFinished], timeout: 1)
-        XCTAssertFalse(model.seen.contains(.loaded(1)))
+        await wait(for: [secondFinished], timeout: 1)
+        #expect(!(model.seen.contains(.loaded(1))))
     }
 
     @MainActor
-    func testTasksWithDifferentIdsBothRun() {
+    @Test func testTasksWithDifferentIdsBothRun() async {
         let model = Probe()
         let done = expectation(description: "both")
         done.expectedFulfillmentCount = 2
@@ -180,23 +181,23 @@ final class EffectTests: XCTestCase {
         }
         model.send(.load)
         model.send(.reload)
-        wait(for: [done], timeout: 1)
+        await wait(for: [done], timeout: 1)
     }
 
     @MainActor
-    func testSameIdReplacesThePreviousEffect() {
+    @Test func testSameIdReplacesThePreviousEffect() {
         let model = Probe()
         model.effectsByAction[.arm] = .onNext(id: "job") { model.log.append("first") }
         model.effectsByAction[.reload] = .onNext(id: "job") { model.log.append("second") }
         model.send(.arm)
         model.send(.reload)
-        XCTAssertEqual(model.log, ["first"])
+        #expect(model.log == ["first"])
         model.cancel("job")
-        XCTAssertEqual(model.log, ["first", "second"])
+        #expect(model.log == ["first", "second"])
     }
 
     @MainActor
-    func testCancelInsideObservableDropsTheEffect() {
+    @Test func testCancelInsideObservableDropsTheEffect() async {
         let model = Probe()
         let done = expectation(description: "not loaded")
         done.isInverted = true
@@ -208,23 +209,23 @@ final class EffectTests: XCTestCase {
             if case .loaded = action { done.fulfill() }
         }
         model.send(.load)
-        wait(for: [done], timeout: 0.3)
+        await wait(for: [done], timeout: 0.3)
     }
 
     @MainActor
-    func testSendWithIdStoresTheEffectUnderThatId() throws {
+    @Test func testSendWithIdStoresTheEffectUnderThatId() throws {
         let model = Probe()
         model.effectsByAction[.arm] = .onNext { model.log.append("held") }
         var id: EffectID?
         model.send(.arm, id: &id)
         model.send(.plain)
-        XCTAssertTrue(model.log.isEmpty)
-        model.cancel(try XCTUnwrap(id))
-        XCTAssertEqual(model.log, ["held"])
+        #expect(model.log.isEmpty)
+        model.cancel(try #require(id))
+        #expect(model.log == ["held"])
     }
 
     @MainActor
-    func testDisappearCancelsAnAnonymousTask() {
+    @Test func testDisappearCancelsAnAnonymousTask() async {
         let model = Probe()
         let started = expectation(description: "started")
         let done = expectation(description: "not loaded")
@@ -242,20 +243,20 @@ final class EffectTests: XCTestCase {
             if case .loaded = action { done.fulfill() }
         }
         model.send(.load)
-        wait(for: [started], timeout: 1)
+        await wait(for: [started], timeout: 1)
         model.disappear()
         release?.resume()
-        wait(for: [done], timeout: 0.3)
+        await wait(for: [done], timeout: 0.3)
     }
 
     @MainActor
-    func testReleasingTheModelRunsOnNext() {
+    @Test func testReleasingTheModelRunsOnNext() {
         let box = LogBox()
         do {
             let model = Probe()
             model.effectsByAction[.arm] = .onNext { box.lines.append("dead") }
             model.send(.arm)
         }
-        XCTAssertEqual(box.lines, ["dead"])
+        #expect(box.lines == ["dead"])
     }
 }

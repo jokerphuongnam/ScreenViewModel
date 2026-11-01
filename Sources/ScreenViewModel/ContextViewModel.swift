@@ -12,13 +12,13 @@ import SwiftUI
 @MainActor
 @Observable
 @dynamicMemberLookup
-public final class ViewModel<Screen: ScreenContext> {
+public final class ViewModel<Screen: ScreenContext, Source> {
     @ObservationIgnored private var factory: (() -> ViewModelContext<Screen>)?
     @ObservationIgnored private var core: ViewModelContext<Screen>?
     @ObservationIgnored private let runner = ActionEffectRunner()
 
-    public init(context: @autoclosure @escaping () -> ViewModelContext<Screen>) {
-        self.factory = context
+    init(factory: (() -> ViewModelContext<Screen>)?) {
+        self.factory = factory
     }
 
     deinit {

@@ -5,14 +5,14 @@ A small view-model loop for a SwiftUI screen. The view calls `send`. The screen 
 Platforms: macOS 14, iOS 17, watchOS 10, tvOS 17, and visionOS 1. The screen loop uses Foundation and Observation. Parent, global, and share injection use SwiftUI. There is no AppKit or UIKit dependency.
 
 ```swift
-.package(url: "https://github.com/jokerphuongnam/ScreenViewModel", from: "2.0.0")
+.package(url: "https://github.com/jokerphuongnam/ScreenViewModel", from: "3.0.0")
 ```
 
 ```swift
 import ScreenViewModel
 ```
 
-`2.0.0` is the current stable release. `1.0.0` is the first stable API. Tags named `0.x.x-betaXX` are pre-release and are not a stable API. Version numbers follow [Semantic Versioning](https://semver.org/): the third number is a small backward compatible fix, the second number adds backward compatible API, and the first number changes only when existing API breaks. `from: "1.0.0"` accepts every `1.x` release. `2.0.0` adds `.id(&)` and gives `.redirect` an id, so a `switch` that matched `.redirect(let action)` must match the id as well. `.redirect(action)` still builds.
+`3.0.0` is the current stable release. `ViewModel` requires a source: `ViewState`, `ParentScope`, `GlobalScope`, or `ShareScope`. `1.0.0` is the first stable API. Tags named `0.x.x-betaXX` are pre-release and are not a stable API. Version numbers follow [Semantic Versioning](https://semver.org/): the third number is a small backward compatible fix, the second number adds backward compatible API, and the first number changes only when existing API breaks. `from: "1.0.0"` accepts every `1.x` release. `2.0.0` adds `.id(&)` and gives `.redirect` an id, so a `switch` that matched `.redirect(let action)` must match the id as well. `.redirect(action)` still builds.
 
 ## Use it
 
@@ -242,7 +242,7 @@ struct CounterView: View {
   ```
   `model.binding(\.name, send: { .setName($0) })` is still there when an edit should become an Action instead.
 - `ActionEffect`: `.none`, `.send`, `.task(priority:id:)` (running a task with the same id replaces the old one), `.cancel(id:)`, `.onDisappear`, `.merge`. All tasks are cancelled when the ViewModel is released.
-- Testing: `let vm = ViewModel(context: CounterLogic(service: .fake))`, then `vm.send(.increment)`, then `XCTAssertEqual(vm.count, 1)`.
+- Testing: `let viewModel = ViewModel(context: CounterLogic(service: .fake))`, then `viewModel.send(.increment)`, then `XCTAssertEqual(viewModel.count, 1)`.
 - Lifecycle with the new ViewModel:
   - `globalState { ViewModel(context: …) }` / `@GlobalViewModel`
   - `shareState(id:) { … }` / `@ShareViewModel(id:)`

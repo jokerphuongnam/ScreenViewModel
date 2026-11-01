@@ -10,4 +10,8 @@ public struct GlobalState<Action, Model: ScreenModel<Action>>: DynamicProperty {
     public var wrappedValue: Model {
         GlobalRegistry.model(as: Model.self)
     }
+
+    public var projectedValue: Bindable<Model> {
+        Bindable(wrappedValue)
+    }
 }

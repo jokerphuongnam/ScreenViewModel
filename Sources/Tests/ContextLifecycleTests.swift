@@ -1,108 +1,109 @@
-import XCTest
+import Foundation
+import Testing
 @testable import ScreenViewModel
 
 /// Parent, share, global and cache lifetimes for the context-based ViewModel.
-final class ContextLifecycleTests: XCTestCase {
+@Suite(.serialized) final class ContextLifecycleTests {
     // MARK: ParentState
 
     @MainActor
-    func testParentScopePublishesTheViewModelToChildrenNotSiblings() {
+    @Test func testParentScopePublishesTheViewModelToChildrenNotSiblings() {
         let parent = ViewModel(context: CounterLogic(tracker: Tracker()))
         let sibling = ViewModel(context: GreetingLogic(name: "sib"))
         let root = ScreenScope().setting(parent)
         let left = root.setting(sibling)
         let right = root.setting(ParentModel())
-        XCTAssertTrue(left.model(ViewModel<CounterScreen>.self) === parent)
-        XCTAssertTrue(right.model(ViewModel<CounterScreen>.self) === parent)
-        XCTAssertNil(right.model(ViewModel<GreetingScreen>.self))
+        #expect(left.model(ViewModel<CounterScreen, ViewState>.self) === parent)
+        #expect(right.model(ViewModel<CounterScreen, ViewState>.self) === parent)
+        #expect(right.model(ViewModel<GreetingScreen, ViewState>.self) == nil)
     }
 
     @MainActor
-    func testChildSendsToParentViewModel() {
+    @Test func testChildSendsToParentViewModel() {
         let parent = ViewModel(context: CounterLogic(tracker: Tracker()))
         let scope = ScreenScope().setting(parent)
-        scope.model(ViewModel<CounterScreen>.self)?.send(.increment)
-        XCTAssertEqual(parent.count, 1)
+        scope.model(ViewModel<CounterScreen, ViewState>.self)?.send(.increment)
+        #expect(parent.count == 1)
     }
 
     // MARK: ShareState
 
     @MainActor
-    func testShareStateReturnsOneInstancePerIdAndBuildsOnce() {
+    @Test func testShareStateReturnsOneInstancePerIdAndBuildsOnce() {
         let tracker = Tracker()
         let id = UUID().uuidString
-        let first = shareState(id: id, ViewModel(context: CounterLogic(tracker: tracker)))
-        let second = shareState(id: id, ViewModel(context: CounterLogic(tracker: tracker)))
-        let other = shareState(id: id + "-other", ViewModel(context: CounterLogic(tracker: tracker)))
-        XCTAssertTrue(first === second)
-        XCTAssertFalse(first === other)
+        let first = ViewModel<CounterScreen, ShareScope>.make(id: id, context: CounterLogic(tracker: tracker))
+        let second = ViewModel<CounterScreen, ShareScope>.make(id: id, context: CounterLogic(tracker: tracker))
+        let other = ViewModel<CounterScreen, ShareScope>.make(id: id + "-other", context: CounterLogic(tracker: tracker))
+        #expect(first === second)
+        #expect(!(first === other))
         first.send(.increment)
-        XCTAssertEqual(second.count, 1)
-        XCTAssertEqual(other.count, 0)
-        XCTAssertEqual(tracker.made, 2)
+        #expect(second.count == 1)
+        #expect(other.count == 0)
+        #expect(tracker.made == 2)
     }
 
     @MainActor
-    func testSharedViewModelIsReleasedWithTheLastScreen() {
+    @Test func testSharedViewModelIsReleasedWithTheLastScreen() {
         let tracker = Tracker()
         let id = UUID().uuidString
-        weak var weakShared: ViewModel<CounterScreen>?
+        weak var weakShared: ViewModel<CounterScreen, ShareScope>?
         do {
-            var screenA: ViewModel<CounterScreen>? = shareState(id: id, ViewModel(context: CounterLogic(tracker: tracker)))
-            var screenB: ViewModel<CounterScreen>? = shareState(id: id, ViewModel(context: CounterLogic(tracker: tracker)))
+            var screenA: ViewModel<CounterScreen, ShareScope>? = ViewModel<CounterScreen, ShareScope>.make(id: id, context: CounterLogic(tracker: tracker))
+            var screenB: ViewModel<CounterScreen, ShareScope>? = ViewModel<CounterScreen, ShareScope>.make(id: id, context: CounterLogic(tracker: tracker))
             weakShared = screenA
             screenA = nil
-            XCTAssertNotNil(weakShared)
+            #expect(weakShared != nil)
             _ = screenB
             screenB = nil
         }
-        XCTAssertNil(weakShared)
-        let fresh = shareState(id: id, ViewModel(context: CounterLogic(tracker: tracker)))
-        XCTAssertEqual(fresh.count, 0)
+        #expect(weakShared == nil)
+        let fresh = ViewModel<CounterScreen, ShareScope>.make(id: id, context: CounterLogic(tracker: tracker))
+        #expect(fresh.count == 0)
     }
 
     @MainActor
-    func testShareViewModelWrapperJoinsTheGroupAndHoldsIt() {
+    @Test func testShareViewModelWrapperJoinsTheGroupAndHoldsIt() {
         let tracker = Tracker()
         let id = UUID().uuidString
-        let creator = ShareViewModel<CounterScreen>(wrappedValue: ViewModel(context: CounterLogic(tracker: tracker)), id: id)
+        let creator = ShareViewModel<CounterScreen>(wrappedValue: ViewModel<CounterScreen, ShareScope>.make(id: id, context: CounterLogic(tracker: tracker)), id: id)
         let joiner = ShareViewModel<CounterScreen>(id: id)
-        let duplicate = ShareViewModel<CounterScreen>(wrappedValue: ViewModel(context: CounterLogic(tracker: tracker)), id: id)
+        let duplicate = ShareViewModel<CounterScreen>(wrappedValue: ViewModel<CounterScreen, ShareScope>.make(id: id, context: CounterLogic(tracker: tracker)), id: id)
         creator.wrappedValue.send(.increment)
-        XCTAssertTrue(joiner.wrappedValue === creator.wrappedValue)
-        XCTAssertTrue(duplicate.wrappedValue === creator.wrappedValue)
-        XCTAssertEqual(joiner.wrappedValue.count, 1)
-        XCTAssertEqual(tracker.made, 1)
+        #expect(joiner.wrappedValue === creator.wrappedValue)
+        #expect(duplicate.wrappedValue === creator.wrappedValue)
+        #expect(joiner.wrappedValue.count == 1)
+        #expect(tracker.made == 1)
     }
 
     // MARK: GlobalState
 
     @MainActor
-    func testGlobalStateKeepsTheFirstInstanceAndSkipsLaterContexts() {
+    @Test func testGlobalStateKeepsTheFirstInstanceAndSkipsLaterContexts() {
         let tracker = Tracker()
-        let first = globalState(ViewModel(context: GlobalOnlyLogic(tracker: tracker)))
+        let first = ViewModel<GlobalOnlyScreen, GlobalScope>.make(context: GlobalOnlyLogic(tracker: tracker))
         first.send(.increment)
-        let again = globalState(ViewModel(context: GlobalOnlyLogic(tracker: tracker)))
-        XCTAssertTrue(first === again)
-        XCTAssertEqual(GlobalViewModel<GlobalOnlyScreen>().wrappedValue.count, first.count)
-        XCTAssertTrue(GlobalViewModel<GlobalOnlyScreen>().wrappedValue === first)
-        XCTAssertLessThanOrEqual(tracker.made, 1)
+        let again = ViewModel<GlobalOnlyScreen, GlobalScope>.make(context: GlobalOnlyLogic(tracker: tracker))
+        #expect(first === again)
+        #expect(GlobalViewModel<GlobalOnlyScreen>().wrappedValue.count == first.count)
+        #expect(GlobalViewModel<GlobalOnlyScreen>().wrappedValue === first)
+        #expect(tracker.made <= 1)
     }
 
     @MainActor
-    func testGlobalViewModelOutlivesItsScreens() {
-        weak var weakGlobal: ViewModel<GlobalOnlyScreen>?
+    @Test func testGlobalViewModelOutlivesItsScreens() {
+        weak var weakGlobal: ViewModel<GlobalOnlyScreen, GlobalScope>?
         do {
-            let screen = globalState(ViewModel(context: GlobalOnlyLogic(tracker: Tracker())))
+            let screen = ViewModel<GlobalOnlyScreen, GlobalScope>.make(context: GlobalOnlyLogic(tracker: Tracker()))
             weakGlobal = screen
         }
-        XCTAssertNotNil(weakGlobal)
+        #expect(weakGlobal != nil)
     }
 
     // MARK: Cache
 
     @MainActor
-    func testTwoViewModelsShareOneCachedCall() async {
+    @Test func testTwoViewModelsShareOneCachedCall() async {
         let key = UUID().uuidString
         let service = FakeCounterService()
         service.value = 9
@@ -112,16 +113,16 @@ final class ContextLifecycleTests: XCTestCase {
         a.send(.cached(key))
         b.send(.cached(key))
         await waitUntil { a.loaded == 9 && b.loaded == 9 }
-        XCTAssertEqual(a.loaded, 9)
-        XCTAssertEqual(b.loaded, 9)
-        XCTAssertEqual(service.calls, 1)
+        #expect(a.loaded == 9)
+        #expect(b.loaded == 9)
+        #expect(service.calls == 1)
     }
 
     // MARK: Old path untouched
 
     @MainActor
-    func testScreenModelStillAdoptsTheOldContract() {
+    @Test func testScreenModelStillAdoptsTheOldContract() {
         let model: any ScreenModelProtocol = ParentModel()
-        XCTAssertNotNil(model)
+        #expect(model != nil)
     }
 }

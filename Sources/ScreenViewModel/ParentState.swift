@@ -34,3 +34,9 @@ public struct ParentState<Model: AnyObject>: DynamicProperty {
         return model
     }
 }
+
+extension ParentState where Model: Observable {
+    public var projectedValue: Bindable<Model> {
+        Bindable(wrappedValue)
+    }
+}

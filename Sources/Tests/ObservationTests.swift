@@ -1,36 +1,37 @@
+import Foundation
 import Observation
-import XCTest
+import Testing
 @testable import ScreenViewModel
 
-final class ObservationTests: XCTestCase {
+@Suite(.serialized) final class ObservationTests {
     @MainActor
-    func testGlobalCreatorAndReadersUpdate() {
+    @Test func testGlobalCreatorAndReadersUpdate() async {
         let model = globalState(ObservedModel())
         let reader = GlobalState<ProbeAction, ObservedModel>()
-        expectChange { model.count } change: { model.count += 1 }
-        expectChange { reader.wrappedValue.count } change: { model.count += 1 }
+        await expectChange { model.count } change: { model.count += 1 }
+        await expectChange { reader.wrappedValue.count } change: { model.count += 1 }
     }
 
     @MainActor
-    func testShareCreatorAndReadersUpdate() {
+    @Test func testShareCreatorAndReadersUpdate() async {
         let id = "observe-\(UUID().uuidString)"
         let model = shareState(id: id, ObservedModel())
         let reader = ShareState<ProbeAction, ObservedModel>(id: id)
-        expectChange { model.title } change: { model.title = "next" }
-        expectChange { reader.wrappedValue.title } change: { model.title = "after" }
+        await expectChange { model.title } change: { model.title = "next" }
+        await expectChange { reader.wrappedValue.title } change: { model.title = "after" }
     }
 
     @MainActor
-    func testParentAndChildUpdateFromTheSameModel() throws {
+    @Test func testParentAndChildUpdateFromTheSameModel() async throws {
         let parent = ObservedModel()
         let published = ScreenScope().setting(parent).model(ObservedModel.self)
-        let child = try XCTUnwrap(published)
-        expectChange { parent.count } change: { parent.count += 1 }
-        expectChange { child.count } change: { parent.count += 1 }
+        let child = try #require(published)
+        await expectChange { parent.count } change: { parent.count += 1 }
+        await expectChange { child.count } change: { parent.count += 1 }
     }
 
     @MainActor
-    private func expectChange(_ read: () -> some Any, change: () -> Void) {
+    private func expectChange(_ read: () -> some Any, change: () -> Void) async {
         let changed = expectation(description: "changed")
         withObservationTracking {
             _ = read()
@@ -38,7 +39,7 @@ final class ObservationTests: XCTestCase {
             changed.fulfill()
         }
         change()
-        wait(for: [changed], timeout: 1)
+        await wait(for: [changed], timeout: 1)
     }
 }
 

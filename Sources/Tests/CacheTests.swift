@@ -1,26 +1,26 @@
-import XCTest
+import Foundation
+import Testing
 @testable import ScreenViewModel
 
-final class CacheTests: XCTestCase {
-    override func tearDown() {
+@Suite(.serialized) final class CacheTests {
+    deinit {
         CacheClock.now = { Date() }
-        super.tearDown()
     }
 
     @MainActor
-    func testSameKeyWithDifferentResultsAreDifferentCaches() async throws {
+    @Test func testSameKeyWithDifferentResultsAreDifferentCaches() async throws {
         let text = try await cache(key: "fact", staleTime: .seconds(60), gcTime: .seconds(60)) { "A" }
         let number = try await cache(key: "fact", staleTime: .seconds(60), gcTime: .seconds(60)) { 1 }
         let textAgain = try await cache(key: "fact", staleTime: .seconds(60), gcTime: .seconds(60)) { "B" }
         let numberAgain = try await cache(key: "fact", staleTime: .seconds(60), gcTime: .seconds(60)) { 2 }
-        XCTAssertEqual(text, "A")
-        XCTAssertEqual(number, 1)
-        XCTAssertEqual(textAgain, "A")
-        XCTAssertEqual(numberAgain, 1)
+        #expect(text == "A")
+        #expect(number == 1)
+        #expect(textAgain == "A")
+        #expect(numberAgain == 1)
     }
 
     @MainActor
-    func testCacheKeepsTheValueUntilStaleTime() async throws {
+    @Test func testCacheKeepsTheValueUntilStaleTime() async throws {
         let key = UUID().uuidString
         let calls = CallCount()
         let start = Date(timeIntervalSince1970: 1_700_000_000)
@@ -34,13 +34,13 @@ final class CacheTests: XCTestCase {
             calls.value += 1
             return "B"
         }
-        XCTAssertEqual(first, "A")
-        XCTAssertEqual(second, "A")
-        XCTAssertEqual(calls.value, 1)
+        #expect(first == "A")
+        #expect(second == "A")
+        #expect(calls.value == 1)
     }
 
     @MainActor
-    func testCacheFetchesAgainAtStaleTime() async throws {
+    @Test func testCacheFetchesAgainAtStaleTime() async throws {
         let key = UUID().uuidString
         let calls = CallCount()
         let start = Date(timeIntervalSince1970: 1_700_000_000)
@@ -54,12 +54,12 @@ final class CacheTests: XCTestCase {
             calls.value += 1
             return "B"
         }
-        XCTAssertEqual(second, "B")
-        XCTAssertEqual(calls.value, 2)
+        #expect(second == "B")
+        #expect(calls.value == 2)
     }
 
     @MainActor
-    func testViewModelSharesOneAPICall() async throws {
+    @Test func testViewModelSharesOneAPICall() async throws {
         let key = UUID().uuidString
         let calls = CallCount()
         let ready = Ready()
@@ -80,17 +80,17 @@ final class CacheTests: XCTestCase {
             }
         }
         await Task.yield()
-        XCTAssertEqual(calls.value, 1)
+        #expect(calls.value == 1)
         gate.open()
         let firstValue = try await first.value
         let secondValue = try await second.value
-        XCTAssertEqual(firstValue, "A")
-        XCTAssertEqual(secondValue, "A")
-        XCTAssertEqual(calls.value, 1)
+        #expect(firstValue == "A")
+        #expect(secondValue == "A")
+        #expect(calls.value == 1)
     }
 
     @MainActor
-    func testSameKeySharesOneFetch() {
+    @Test func testSameKeySharesOneFetch() async {
         let key = UUID().uuidString
         let calls = CallCount()
         let gate = Gate()
@@ -106,72 +106,72 @@ final class CacheTests: XCTestCase {
             return "B"
         }
         let reader = CacheState<String>(key: key)
-        wait(for: [started], timeout: 1)
-        XCTAssertEqual(calls.value, 1)
-        XCTAssertTrue(first.isPending)
-        XCTAssertTrue(reader.wrappedValue.isFetching)
+        await wait(for: [started], timeout: 1)
+        #expect(calls.value == 1)
+        #expect(first.isPending)
+        #expect(reader.wrappedValue.isFetching)
         gate.open()
-        waitUntil { first.data != nil }
-        XCTAssertEqual(first.data, "A")
-        XCTAssertEqual(second.data, "A")
-        XCTAssertTrue(first.isSuccess)
-        XCTAssertFalse(first.isFetching)
+        await waitUntil { first.data != nil }
+        #expect(first.data == "A")
+        #expect(second.data == "A")
+        #expect(first.isSuccess)
+        #expect(!(first.isFetching))
     }
 
     @MainActor
-    func testFreshCacheDoesNotFetchAgain() {
+    @Test func testFreshCacheDoesNotFetchAgain() async {
         let key = UUID().uuidString
         let calls = CallCount()
         let first = cached(key: key, staleTime: .seconds(60), gcTime: .seconds(60)) {
             calls.value += 1
             return "A"
         }
-        waitUntil { first.data != nil }
+        await waitUntil { first.data != nil }
         let second = cached(key: key, staleTime: .seconds(60), gcTime: .seconds(60)) {
             calls.value += 1
             return "B"
         }
-        XCTAssertEqual(second.data, "A")
-        XCTAssertEqual(calls.value, 1)
+        #expect(second.data == "A")
+        #expect(calls.value == 1)
     }
 
     @MainActor
-    func testStaleObserverFetchesAgainAndKeepsData() {
+    @Test func testStaleObserverFetchesAgainAndKeepsData() async {
         let key = UUID().uuidString
         let calls = CallCount()
         let first = cached(key: key, staleTime: .zero, gcTime: .seconds(60)) {
             calls.value += 1
             return calls.value == 1 ? "A" : "B"
         }
-        waitUntil { first.data == "A" }
+        await waitUntil { first.data == "A" }
         let second = cached(key: key, staleTime: .zero, gcTime: .seconds(60)) {
             calls.value += 1
             return "B"
         }
-        XCTAssertEqual(second.data, "A")
-        XCTAssertTrue(second.isFetching)
-        waitUntil { second.data == "B" }
-        XCTAssertEqual(first.data, "B")
-        XCTAssertEqual(calls.value, 2)
+        #expect(second.data == "A")
+        #expect(second.isFetching)
+        await waitUntil { second.data == "B" }
+        #expect(first.data == "B")
+        #expect(calls.value == 2)
     }
 
     @MainActor
-    func testLastObserverDropsTheCacheAfterGcTime() {
+    @Test func testLastObserverDropsTheCacheAfterGcTime() async {
         let key = UUID().uuidString
         var held: Cached<String>? = cached(key: key, staleTime: .seconds(60), gcTime: .zero) {
             "A"
         }
-        waitUntil { held?.data == "A" }
+        await waitUntil { held?.data == "A" }
         held = nil
         let again = cached(key: key, staleTime: .seconds(60), gcTime: .zero) {
             "B"
         }
-        XCTAssertTrue(again.isPending)
-        waitUntil { again.data == "B" }
+        #expect(again.isPending)
+        await waitUntil { again.data == "B" }
     }
 
     @MainActor
-    func testFailureIsVisibleAndRefetchReplacesIt() {
+    @Test func testFailureIsVisibleAndRefetchReplacesIt() async {
         let key = UUID().uuidString
         let calls = CallCount()
         let query = cached(key: key, gcTime: .seconds(60)) {
@@ -181,16 +181,16 @@ final class CacheTests: XCTestCase {
             }
             return "A"
         }
-        waitUntil { query.isError }
-        XCTAssertNil(query.data)
+        await waitUntil { query.isError }
+        #expect(query.data == nil)
         query.refetch()
-        waitUntil { query.data == "A" }
-        XCTAssertTrue(query.isSuccess)
-        XCTAssertNil(query.error)
+        await waitUntil { query.data == "A" }
+        #expect(query.isSuccess)
+        #expect(query.error == nil)
     }
 
     @MainActor
-    private func waitUntil(_ ready: @escaping @MainActor () -> Bool) {
+    private func waitUntil(_ ready: @escaping @MainActor () -> Bool) async {
         let done = expectation(description: "ready")
         Task { @MainActor in
             while !ready() {
@@ -198,7 +198,7 @@ final class CacheTests: XCTestCase {
             }
             done.fulfill()
         }
-        wait(for: [done], timeout: 2)
+        await wait(for: [done], timeout: 2)
     }
 }
 

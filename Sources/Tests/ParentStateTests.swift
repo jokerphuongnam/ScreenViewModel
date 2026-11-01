@@ -1,18 +1,19 @@
-import XCTest
+import Foundation
+import Testing
 @testable import ScreenViewModel
 
-final class ParentStateTests: XCTestCase {
+@Suite(.serialized) final class ParentStateTests {
     @MainActor
-    func testChildScopeSeesTheParentModelAndNotItsSibling() {
+    @Test func testChildScopeSeesTheParentModelAndNotItsSibling() {
         let parent = ParentModel()
         let left = LeftModel()
         let right = RightModel()
         let root = ScreenScope().setting(parent)
         let leftScope = root.setting(left)
         let rightScope = root.setting(right)
-        XCTAssertTrue(leftScope.model(ParentModel.self) === parent)
-        XCTAssertTrue(rightScope.model(ParentModel.self) === parent)
-        XCTAssertNil(leftScope.model(RightModel.self))
-        XCTAssertNil(rightScope.model(LeftModel.self))
+        #expect(leftScope.model(ParentModel.self) === parent)
+        #expect(rightScope.model(ParentModel.self) === parent)
+        #expect(leftScope.model(RightModel.self) == nil)
+        #expect(rightScope.model(LeftModel.self) == nil)
     }
 }

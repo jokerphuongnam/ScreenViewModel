@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import ScreenViewModel
 
 enum ProbeAction: ScreenAction, Hashable {
@@ -78,3 +79,58 @@ final class LifeModel: ScreenModel<ProbeAction> {
 final class ParentModel: ScreenModel<ProbeAction> {}
 final class LeftModel: ScreenModel<ProbeAction> {}
 final class RightModel: ScreenModel<ProbeAction> {}
+
+// MARK: - Swift Testing expectation helper
+
+/// Thread-safe expectation helper for Swift Testing (fulfill / inverted / count).
+final class Expectation: @unchecked Sendable {
+    let description: String
+    var expectedFulfillmentCount = 1
+    var isInverted = false
+    private let lock = NSLock()
+    private var count = 0
+
+    init(description: String) { self.description = description }
+
+    func fulfill() {
+        lock.lock(); count += 1; lock.unlock()
+    }
+
+    var fulfillmentCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return count
+    }
+}
+
+func expectation(description: String) -> Expectation {
+    Expectation(description: description)
+}
+
+/// Polls until every expectation is met (or, when inverted, until the timeout
+/// passes without fulfillment); records a Swift Testing issue otherwise.
+@MainActor
+func wait(
+    for expectations: [Expectation],
+    timeout: Double,
+    sourceLocation: SourceLocation = #_sourceLocation
+) async {
+    let deadline = Date().addingTimeInterval(timeout)
+    func satisfied() -> Bool {
+        expectations.allSatisfy { $0.isInverted || $0.fulfillmentCount >= $0.expectedFulfillmentCount }
+    }
+    while Date() < deadline {
+        if expectations.contains(where: { $0.isInverted && $0.fulfillmentCount > 0 }) { break }
+        if satisfied() && !expectations.contains(where: \.isInverted) { break }
+        try? await Task.sleep(nanoseconds: 5_000_000)
+    }
+    for e in expectations {
+        if e.isInverted {
+            #expect(e.fulfillmentCount == 0, "inverted expectation '\(e.description)' was fulfilled",
+                    sourceLocation: sourceLocation)
+        } else {
+            #expect(e.fulfillmentCount >= e.expectedFulfillmentCount,
+                    "expectation '\(e.description)' not fulfilled within \(timeout)s",
+                    sourceLocation: sourceLocation)
+        }
+    }
+}

@@ -36,6 +36,10 @@ public struct ShareState<Action, Model: ScreenModel<Action>>: DynamicProperty {
         return model
     }
 
+    public var projectedValue: Bindable<Model> {
+        Bindable(wrappedValue)
+    }
+
     private final class Hold {
         var value: Model?
     }

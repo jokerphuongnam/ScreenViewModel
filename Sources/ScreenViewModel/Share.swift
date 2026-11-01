@@ -47,8 +47,8 @@ private final class WeakBox {
 /// the registry is weak, and the last screen holding it releases it. `model` is only built when `id` has none.
 @MainActor
 @discardableResult
-public func shareState<Screen: ScreenContext>(id: String, _ model: @autoclosure () -> ViewModel<Screen>) -> ViewModel<Screen> {
-    if let existing = ShareRegistry.existing(id: id, as: ViewModel<Screen>.self) {
+public func shareState<Screen: ScreenContext>(id: String, _ model: @autoclosure () -> ViewModel<Screen, ShareScope>) -> ViewModel<Screen, ShareScope> {
+    if let existing = ShareRegistry.existing(id: id, as: ViewModel<Screen, ShareScope>.self) {
         return existing
     }
     return ShareRegistry.insert(id: id, model())

@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import ScreenViewModel
 
 enum EffectScreen: ScreenContext {
@@ -31,34 +32,34 @@ final class EffectLogic: ViewModelContext<EffectScreen> {
 /// A context that overrides nothing: the default `observable` and `binding` hooks run.
 final class PassiveLogic: ViewModelContext<EffectScreen> {}
 
-final class ContextCoverageTests: XCTestCase {
+@Suite(.serialized) final class ContextCoverageTests {
     @MainActor
-    func testDefaultHooksLeaveStateAsSentOrBound() {
+    @Test func testDefaultHooksLeaveStateAsSentOrBound() {
         let model = ViewModel(context: PassiveLogic())
         model.send(.stopAll)                 // default observable -> .none, no change
-        XCTAssertEqual(model.value, 0)
+        #expect(model.value == 0)
         model.value = 5                      // default binding hook -> keeps the write
         model.note = "n"
-        XCTAssertEqual(model.value, 5)
-        XCTAssertEqual(model.note, "n")
+        #expect(model.value == 5)
+        #expect(model.note == "n")
     }
 
     @MainActor
-    func testCancelEffectStopsTheTaskWithThatId() async {
+    @Test func testCancelEffectStopsTheTaskWithThatId() async {
         let tracker = Tracker()
         let model = ViewModel(context: EffectLogic(tracker: tracker))
         model.send(.start("a"))
         model.send(.start("b"))
-        XCTAssertEqual(model.runningTaskCount, 2)
+        #expect(model.runningTaskCount == 2)
         model.send(.stopViaEffect("a"))
         await waitUntil { tracker.cancelled == 1 }
-        XCTAssertEqual(tracker.cancelled, 1)
-        XCTAssertEqual(model.runningTaskCount, 1)
+        #expect(tracker.cancelled == 1)
+        #expect(model.runningTaskCount == 1)
         model.send(.stopAll)
     }
 
     @MainActor
-    func testCancelAllStopsTasksAndRunsCleanups() async {
+    @Test func testCancelAllStopsTasksAndRunsCleanups() async {
         let tracker = Tracker()
         let model = ViewModel(context: EffectLogic(tracker: tracker))
         model.send(.start("a"))
@@ -66,38 +67,38 @@ final class ContextCoverageTests: XCTestCase {
         model.send(.watch("w"))
         model.send(.stopAll)
         await waitUntil { tracker.cancelled == 2 }
-        XCTAssertEqual(tracker.cancelled, 2)
-        XCTAssertEqual(tracker.log, ["cleanup w"])
-        XCTAssertEqual(model.runningTaskCount, 0)
+        #expect(tracker.cancelled == 2)
+        #expect(tracker.log == ["cleanup w"])
+        #expect(model.runningTaskCount == 0)
     }
 
     @MainActor
-    func testDisappearCancelsAModelThatOutlivesItsView() async {
+    @Test func testDisappearCancelsAModelThatOutlivesItsView() async {
         let tracker = Tracker()
         let model = ViewModel(context: EffectLogic(tracker: tracker))
         model.send(.start("a"))
         model.send(.watch("w"))
         model.disappear()
         await waitUntil { tracker.cancelled == 1 }
-        XCTAssertEqual(tracker.log, ["cleanup w"])
-        XCTAssertEqual(model.runningTaskCount, 0)
+        #expect(tracker.log == ["cleanup w"])
+        #expect(model.runningTaskCount == 0)
     }
 
     @MainActor
-    func testReleaseOffTheMainThreadCleansUpOnMain() async {
+    @Test func testReleaseOffTheMainThreadCleansUpOnMain() async {
         let tracker = Tracker()
-        final class Box: @unchecked Sendable { var model: ViewModel<EffectScreen>? }
+        final class Box: @unchecked Sendable { var model: ViewModel<EffectScreen, ViewState>? }
         let box = Box()
         box.model = ViewModel(context: EffectLogic(tracker: tracker))
         box.model?.send(.watch("bg"))
         await Task.detached { box.model = nil }.value   // last reference dropped on a background thread
         await waitUntil { tracker.log == ["cleanup bg"] }
-        XCTAssertEqual(tracker.log, ["cleanup bg"])
+        #expect(tracker.log == ["cleanup bg"])
     }
 
     @MainActor
-    func testContextStateReadBeforeAViewModelBuildsIt() {
+    @Test func testContextStateReadBeforeAViewModelBuildsIt() {
         let logic = PassiveLogic()
-        XCTAssertEqual(logic.state, EffectScreen.State())
+        #expect(logic.state == EffectScreen.State())
     }
 }

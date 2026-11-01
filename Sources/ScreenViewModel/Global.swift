@@ -37,8 +37,8 @@ enum GlobalRegistry {
 /// The context autoclosure of a dropped duplicate never runs.
 @MainActor
 @discardableResult
-public func globalState<Screen: ScreenContext>(_ model: @autoclosure () -> ViewModel<Screen>) -> ViewModel<Screen> {
-    if let existing = GlobalRegistry.existing(as: ViewModel<Screen>.self) {
+public func globalState<Screen: ScreenContext>(_ model: @autoclosure () -> ViewModel<Screen, GlobalScope>) -> ViewModel<Screen, GlobalScope> {
+    if let existing = GlobalRegistry.existing(as: ViewModel<Screen, GlobalScope>.self) {
         return existing
     }
     return GlobalRegistry.insert(model())
