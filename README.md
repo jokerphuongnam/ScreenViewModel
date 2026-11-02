@@ -5,14 +5,14 @@ A small view-model loop for a SwiftUI screen. The view calls `send`. The screen 
 Platforms: macOS 14, iOS 17, watchOS 10, tvOS 17, and visionOS 1. The screen loop uses Foundation and Observation. Parent, global, and share injection use SwiftUI. There is no AppKit or UIKit dependency.
 
 ```swift
-.package(url: "https://github.com/jokerphuongnam/ScreenViewModel", from: "4.0.0")
+.package(url: "https://github.com/jokerphuongnam/ScreenViewModel", from: "3.1.0")
 ```
 
 ```swift
 import ScreenViewModel
 ```
 
-`4.0.0` is the current stable release. `store.send` and model `send` stay synchronous. The action, its state update, and the redirect chain finish before `send` returns. A `.task` only stores the `Task`. `send` inside that task stays async. `ViewModel` requires a source: `ViewState`, `ParentScope`, `GlobalScope`, or `ShareScope`. `1.0.0` is the first stable API. Tags named `0.x.x-betaXX` are pre-release and are not a stable API. Version numbers follow [Semantic Versioning](https://semver.org/): the third number is a small backward compatible fix, the second number adds backward compatible API, and the first number changes only when existing API breaks. `from: "1.0.0"` accepts every `1.x` release. `2.0.0` adds `.id(&)` and gives `.redirect` an id, so a `switch` that matched `.redirect(let action)` must match the id as well. `.redirect(action)` still builds.
+`3.1.0` is the current stable release. `store.send` and model `send` stay synchronous. The action, its state update, and the redirect chain finish before `send` returns. A `.task` only stores the `Task`. `send` inside that task stays async. `ViewModel` requires a source: `ViewState`, `ParentScope`, `GlobalScope`, or `ShareScope`. `1.0.0` is the first stable API. Tags named `0.x.x-betaXX` are pre-release and are not a stable API. Version numbers follow [Semantic Versioning](https://semver.org/): the third number is a small backward compatible fix, the second number adds backward compatible API, and the first number changes only when existing API breaks. `from: "1.0.0"` accepts every `1.x` release. `2.0.0` adds `.id(&)` and gives `.redirect` an id, so a `switch` that matched `.redirect(let action)` must match the id as well. `.redirect(action)` still builds.
 
 ## Use it
 
@@ -202,7 +202,7 @@ Tests live in `Sources/Tests`. Run them with `swift test`.
 | `1.5.1` | This version list |
 | `2.0.0` | `.id(&)` generates an id for `.onNext`, `.onDisappear`, `.task`, and the action `.redirect` runs next. `.none` has no id. A switch on `.redirect` now includes that id. `cached(key:)` can be called off the main actor. `cache(key:)` also has a synchronous overload whose fetch runs on the caller |
 | `3.0.0` | Source parameter on `ViewModel`. `@ParentState` wrapper removed. The owner calls `ParentScope.make(context:)`. A child stores `@Bindable private var coordinator = Type.make()`. `make()` returns the live instance and does not create one. The out-of-tree case is not handled yet. Global and share owners call `Type.make(id:_:)`. Readers call `Type.make(id:)`. A Global id lives until the process ends; a Share id can be a new instance after the previous one is released. |
-| `4.0.0` | `store.send` and model `send` stay synchronous. The action, its state update, and the redirect chain finish before `send` returns. A `.task` only stores the `Task`. Inside that task, `send` stays `async` and does not wait for a nested `.task` body |
+| `3.1.0` | `store.send` and model `send` stay synchronous. The action, its state update, and the redirect chain finish before `send` returns. A `.task` only stores the `Task`. Inside that task, `send` stays `async` and does not wait for a nested `.task` body |
 
 ## Context ViewModel (2.1)
 
