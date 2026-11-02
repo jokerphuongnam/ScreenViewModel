@@ -18,7 +18,7 @@ import SwiftUI
     }
 
     @MainActor
-    @Test func testSendRunsObservableAndUpdatesState() {
+    @Test func testSendRunsObservableAndUpdatesState() async {
         let model = ViewModel(context: CounterLogic(tracker: Tracker()))
         model.send(.increment)
         model.send(.increment)
@@ -28,7 +28,7 @@ import SwiftUI
     }
 
     @MainActor
-    @Test func testSendAndMergeEffectsRunInOrder() {
+    @Test func testSendAndMergeEffectsRunInOrder() async {
         let model = ViewModel(context: CounterLogic(tracker: Tracker()))
         model.send(.chain)
         #expect(model.count == 2)
@@ -36,7 +36,7 @@ import SwiftUI
     }
 
     @MainActor
-    @Test func testReplacingTheWholeStateIsVisible() {
+    @Test func testReplacingTheWholeStateIsVisible() async {
         let model = ViewModel(context: CounterLogic(tracker: Tracker()))
         model.send(.increment)
         let changed = Flag()
@@ -47,7 +47,7 @@ import SwiftUI
     }
 
     @MainActor
-    @Test func testObservationFiresThroughContextAndSkipsUnchangedEquatableState() {
+    @Test func testObservationFiresThroughContextAndSkipsUnchangedEquatableState() async {
         let model = ViewModel(context: CounterLogic(tracker: Tracker()))
         let countChanged = Flag()
         withObservationTracking { _ = model.count } onChange: { countChanged.set() }
@@ -58,7 +58,7 @@ import SwiftUI
     }
 
     @MainActor
-    @Test func testMakeStateOverrideUsesInjectedDependency() {
+    @Test func testMakeStateOverrideUsesInjectedDependency() async {
         let model = ViewModel(context: GreetingLogic(name: "Dung"))
         #expect(model.greeting == "Hi Dung")
         model.send(.shout)
@@ -66,10 +66,11 @@ import SwiftUI
     }
 
     @MainActor
-    @Test func testBindingReadsStateAndSendsAction() {
+    @Test func testBindingReadsStateAndSendsAction() async {
         let model = ViewModel(context: CounterLogic(tracker: Tracker()))
         let binding = model.binding(\.name, send: { .setName($0) })
         binding.wrappedValue = "typed"
+        await waitUntil { model.name == "typed" }
         #expect(binding.wrappedValue == "typed")
         #expect(model.name == "typed")
     }
@@ -95,7 +96,7 @@ import SwiftUI
     }
 
     @MainActor
-    @Test func testContextIsBuiltOncePerInstance() {
+    @Test func testContextIsBuiltOncePerInstance() async {
         let tracker = Tracker()
         let model = ViewModel(context: CounterLogic(tracker: tracker))
         for _ in 0..<5 {
@@ -109,7 +110,7 @@ import SwiftUI
     /// What SwiftUI does with `@State private var model = ViewModel(context: ...)`: the initializer expression
     /// runs on every view init, but only the first instance is kept; later ones are dropped unread.
     @MainActor
-    @Test func testRebuiltInitializerExpressionsDoNotBuildMoreContexts() {
+    @Test func testRebuiltInitializerExpressionsDoNotBuildMoreContexts() async {
         let tracker = Tracker()
         var stored: ViewModel<CounterScreen, ViewState>?
         for _ in 0..<3 {
@@ -122,6 +123,25 @@ import SwiftUI
     }
 
     // MARK: ActionEffect tasks and cancel
+
+    @MainActor
+    @Test func testSendReturnsWhileTaskIsStillRunning() async {
+        let service = FakeCounterService()
+        service.delay = .seconds(5)
+        let model = ViewModel(context: CounterLogic(tracker: Tracker(), service: service))
+        model.send(.load(id: "slow"))
+        #expect(model.runningTaskCount == 1)
+        #expect(model.loaded == nil)
+        model.send(.stop("slow"))
+    }
+
+    @MainActor
+    @Test func testSendDoesNotReturnUntilRedirectUpdatesState() async {
+        let model = ViewModel(context: CounterLogic(tracker: Tracker()))
+        model.send(.chain)
+        #expect(model.count == 2)
+        #expect(model.name == "chained")
+    }
 
     @MainActor
     @Test func testTaskSendsResultBack() async {
@@ -179,7 +199,7 @@ import SwiftUI
     }
 
     @MainActor
-    @Test func testCancelIdRunsThatCleanupEarly() {
+    @Test func testCancelIdRunsThatCleanupEarly() async {
         let tracker = Tracker()
         let model = ViewModel(context: CounterLogic(tracker: tracker))
         model.send(.watch("a"))
@@ -196,7 +216,7 @@ import SwiftUI
     }
 
     @MainActor
-    @Test func testNonEquatableStateNotifiesOnEverySend() {
+    @Test func testNonEquatableStateNotifiesOnEverySend() async {
         let model = ViewModel(context: GreetingLogic(name: "a"))
         let changed = Flag()
         withObservationTracking { _ = model.greeting } onChange: { changed.set() }
@@ -206,7 +226,7 @@ import SwiftUI
     }
 
     @MainActor
-    @Test func testContextIsTheObservableSourceAndStateReadOutsideIsACopy() {
+    @Test func testContextIsTheObservableSourceAndStateReadOutsideIsACopy() async {
         let logic = CounterLogic(tracker: Tracker())
         let model = ViewModel(context: logic)
         var snapshot = logic.state   // value copy; mutating it does not touch the model
@@ -221,11 +241,12 @@ import SwiftUI
 
     #if canImport(SwiftUI)
     @MainActor
-    @Test func testBindableViewModelGivesBindings() {
+    @Test func testBindableViewModelGivesBindings() async {
         let bindable = Bindable(ViewModel(context: CounterLogic(tracker: Tracker())))
         let model = bindable.wrappedValue
         let name = model.binding(\.name, send: { .setName($0) })
         name.wrappedValue = "bound"
+        await waitUntil { bindable.wrappedValue.name == "bound" }
         #expect(bindable.wrappedValue.name == "bound")
     }
     #endif
@@ -254,7 +275,7 @@ import SwiftUI
     }
 
     @MainActor
-    @Test func testSendAfterBindingSeesTheBoundValue() {
+    @Test func testSendAfterBindingSeesTheBoundValue() async {
         let model = ViewModel(context: CounterLogic(tracker: Tracker()))
         model.count = 10
         model.send(.increment)
@@ -263,7 +284,7 @@ import SwiftUI
 
     #if canImport(SwiftUI)
     @MainActor
-    @Test func testBindableProjectionIsTwoWay() {
+    @Test func testBindableProjectionIsTwoWay() async {
         let model = ViewModel(context: CounterLogic(tracker: Tracker()))
         let bindable = Bindable(model)
         let name: Binding<String> = bindable.name          // what `$model.name` is in a view

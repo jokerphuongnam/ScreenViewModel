@@ -12,7 +12,7 @@ public enum Effect<Action> {
     /// With an id, `cancel(id)` runs it early.
     case onDisappear(id: AnyHashable? = nil, () -> Void)
     /// Async work, like SwiftUI `.task`. The same id replaces the previous task. Disappear cancels it too.
-    case task(TaskPriority, id: AnyHashable? = nil, (_ send: (Action) -> Void) async -> Void)
+    case task(TaskPriority, id: AnyHashable? = nil, (_ send: (Action) async -> Void) async -> Void)
 }
 
 extension Effect {

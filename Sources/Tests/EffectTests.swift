@@ -4,7 +4,7 @@ import Testing
 
 @Suite(.serialized) final class EffectTests {
     @MainActor
-    @Test func testNoneDoesNothing() {
+    @Test func testNoneDoesNothing() async {
         let model = Probe()
         model.send(.plain)
         #expect(model.seen == [.plain])
@@ -12,7 +12,7 @@ import Testing
     }
 
     @MainActor
-    @Test func testRedirectRunsTheNextAction() {
+    @Test func testRedirectRunsTheNextAction() async {
         let model = Probe()
         model.effectsByAction[.addTwo] = .redirect(.addOneThenOne)
         model.effectsByAction[.addOneThenOne] = .redirect(.addOne)
@@ -21,7 +21,15 @@ import Testing
     }
 
     @MainActor
-    @Test func testRedirectStopsAfterSixteenSteps() {
+    @Test func testSendDoesNotReturnUntilRedirectUpdatesState() async {
+        let model = Probe()
+        model.effectsByAction[.addTwo] = .redirect(.addOne)
+        model.send(.addTwo)
+        #expect(model.seen == [.addTwo, .addOne])
+    }
+
+    @MainActor
+    @Test func testRedirectStopsAfterSixteenSteps() async {
         let model = Probe()
         model.effectsByAction[.loop] = .redirect(.loop)
         model.send(.loop)
@@ -29,7 +37,7 @@ import Testing
     }
 
     @MainActor
-    @Test func testAnonymousOnNextRunsBeforeTheFollowingAction() {
+    @Test func testAnonymousOnNextRunsBeforeTheFollowingAction() async {
         let model = Probe()
         model.effectsByAction[.arm] = .onNext { model.log.append("cleaned") }
         model.send(.arm)
@@ -40,7 +48,7 @@ import Testing
     }
 
     @MainActor
-    @Test func testEffectIdIsGeneratedAndReused() {
+    @Test func testEffectIdIsGeneratedAndReused() async {
         let model = Probe()
         var first: EffectID?
         var second: EffectID?
@@ -64,7 +72,7 @@ import Testing
     }
 
     @MainActor
-    @Test func testGeneratedIdWorksOnEveryEffect() {
+    @Test func testGeneratedIdWorksOnEveryEffect() async {
         var taskID: EffectID?
         var disappearID: EffectID?
         var redirectID: EffectID?
@@ -90,7 +98,7 @@ import Testing
     }
 
     @MainActor
-    @Test func testNamedOnNextStaysUntilThatIdIsCancelled() {
+    @Test func testNamedOnNextStaysUntilThatIdIsCancelled() async {
         let model = Probe()
         model.effectsByAction[.arm] = .onNext(id: "clock") { model.log.append("cleaned") }
         model.send(.arm)
@@ -101,7 +109,7 @@ import Testing
     }
 
     @MainActor
-    @Test func testNoneDoesNotClearOnDisappear() {
+    @Test func testNoneDoesNotClearOnDisappear() async {
         let model = Probe()
         model.effectsByAction[.appear] = .onDisappear { model.log.append("gone") }
         model.send(.appear)
@@ -112,7 +120,7 @@ import Testing
     }
 
     @MainActor
-    @Test func testOnDisappearWithIdCanBeCancelledEarly() {
+    @Test func testOnDisappearWithIdCanBeCancelledEarly() async {
         let model = Probe()
         model.effectsByAction[.appear] = .onDisappear(id: "watch") { model.log.append("gone") }
         model.send(.appear)
@@ -127,7 +135,7 @@ import Testing
         let model = Probe()
         let done = expectation(description: "loaded")
         model.effectsByAction[.load] = .task(.userInitiated) { send in
-            send(.loaded(1))
+            await send(.loaded(1))
         }
         model.onEvent = { action in
             if case .loaded(1) = action { done.fulfill() }
@@ -149,9 +157,9 @@ import Testing
                     firstStarted.fulfill()
                 }
                 guard !Task.isCancelled else { return }
-                send(.loaded(1))
+                await send(.loaded(1))
             } else {
-                send(.loaded(2))
+                await send(.loaded(2))
             }
         }
         model.send(.load)
@@ -171,10 +179,10 @@ import Testing
         let done = expectation(description: "both")
         done.expectedFulfillmentCount = 2
         model.effectsByAction[.load] = .task(.userInitiated, id: "a") { send in
-            send(.loaded(1))
+            await send(.loaded(1))
         }
         model.effectsByAction[.reload] = .task(.userInitiated, id: "b") { send in
-            send(.loaded(2))
+            await send(.loaded(2))
         }
         model.onEvent = { action in
             if case .loaded = action { done.fulfill() }
@@ -185,7 +193,7 @@ import Testing
     }
 
     @MainActor
-    @Test func testSameIdReplacesThePreviousEffect() {
+    @Test func testSameIdReplacesThePreviousEffect() async {
         let model = Probe()
         model.effectsByAction[.arm] = .onNext(id: "job") { model.log.append("first") }
         model.effectsByAction[.reload] = .onNext(id: "job") { model.log.append("second") }
@@ -203,7 +211,7 @@ import Testing
         done.isInverted = true
         model.dropLoad = true
         model.effectsByAction[.load] = .task(.userInitiated) { send in
-            send(.loaded(1))
+            await send(.loaded(1))
         }
         model.onEvent = { action in
             if case .loaded = action { done.fulfill() }
@@ -213,7 +221,7 @@ import Testing
     }
 
     @MainActor
-    @Test func testSendWithIdStoresTheEffectUnderThatId() throws {
+    @Test func testSendWithIdStoresTheEffectUnderThatId() async throws {
         let model = Probe()
         model.effectsByAction[.arm] = .onNext { model.log.append("held") }
         var id: EffectID?
@@ -237,7 +245,7 @@ import Testing
                 started.fulfill()
             }
             guard !Task.isCancelled else { return }
-            send(.loaded(1))
+            await send(.loaded(1))
         }
         model.onEvent = { action in
             if case .loaded = action { done.fulfill() }
@@ -250,7 +258,7 @@ import Testing
     }
 
     @MainActor
-    @Test func testReleasingTheModelRunsOnNext() {
+    @Test func testReleasingTheModelRunsOnNext() async {
         let box = LogBox()
         do {
             let model = Probe()

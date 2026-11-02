@@ -59,7 +59,7 @@ final class DemoModel: ScreenModel<DemoAction> {
             return .task(.userInitiated) { send in
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 guard !Task.isCancelled else { return }
-                send(.loaded(id))
+                await send(.loaded(id))
             }
 
         case .stop:
@@ -127,7 +127,9 @@ struct DemoScreen: View {
                 Button("Add two  .redirect") { model.send(.addTwo) }
                 Button("Arm  .onNext") { model.send(.arm) }
                 Button("Load  send(_:id:)") {
-                    model.send(.load, id: &loadID)
+                    var id = loadID
+                    model.send(.load, id: &id)
+                    loadID = id
                 }
                 .disabled(model.loading)
                 Button("Stop  cancel(id)") {

@@ -87,9 +87,9 @@ final class FactModel: ScreenModel<FactAction> {
                     let fact = try await cache(key: "fact", staleTime: .seconds(60)) {
                         "A prime"
                     }
-                    send(.loaded(fact))
+                    await send(.loaded(fact))
                 } catch {
-                    send(.failed)
+                    await send(.failed)
                 }
             }
         case .loaded(let fact):

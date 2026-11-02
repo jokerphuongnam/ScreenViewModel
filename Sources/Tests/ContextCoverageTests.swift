@@ -34,7 +34,7 @@ final class PassiveLogic: ViewModelContext<EffectScreen> {}
 
 @Suite(.serialized) final class ContextCoverageTests {
     @MainActor
-    @Test func testDefaultHooksLeaveStateAsSentOrBound() {
+    @Test func testDefaultHooksLeaveStateAsSentOrBound() async {
         let model = ViewModel(context: PassiveLogic())
         model.send(.stopAll)                 // default observable -> .none, no change
         #expect(model.value == 0)

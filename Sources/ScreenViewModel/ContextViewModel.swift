@@ -67,7 +67,9 @@ public final class ViewModel<Screen: ScreenContext, Source: ViewModelSource> {
         _ keyPath: KeyPath<Screen.State, Value>,
         send action: @escaping (Value) -> Screen.Action
     ) -> Binding<Value> {
-        Binding(get: { self[dynamicMember: keyPath] }, set: { self.send(action($0)) })
+        Binding(get: { self[dynamicMember: keyPath] }, set: { newValue in
+            self.send(action(newValue))
+        })
     }
     #endif
 
@@ -90,7 +92,9 @@ public final class ViewModel<Screen: ScreenContext, Source: ViewModelSource> {
             guard depth < 16 else { return }
             deliver(next, depth: depth + 1)
         case .task(let priority, let id, let work):
-            let send: @MainActor (Screen.Action) -> Void = { [weak self] in self?.send($0) }
+            let send: @MainActor (Screen.Action) async -> Void = { [weak self] action in
+                self?.send(action)
+            }
             let task = Task(priority: priority) { @MainActor in
                 await work(send)
             }
@@ -105,7 +109,9 @@ public final class ViewModel<Screen: ScreenContext, Source: ViewModelSource> {
         case .onDisappear(let id, let body):
             runner.onDisappear(id: id, body)
         case .merge(let effects):
-            effects.forEach { apply($0, depth: depth) }
+            for effect in effects {
+                apply(effect, depth: depth)
+            }
         }
     }
 }

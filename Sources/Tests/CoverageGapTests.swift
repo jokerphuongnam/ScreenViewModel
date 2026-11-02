@@ -43,7 +43,7 @@ final class GapModel: ScreenModel<GapAction> {
     }
 
     @MainActor
-    @Test func testCancelByIdThroughCancelHandle() {
+    @Test func testCancelByIdThroughCancelHandle() async {
         let model = GapModel()
         model.send(.keep)
         model.cancels[.keep]!("keep")
@@ -51,10 +51,10 @@ final class GapModel: ScreenModel<GapAction> {
     }
 
     @MainActor
-    @Test func testRekeyAfterSendMovesAnonymousOnDisappear() {
+    @Test func testRekeyAfterSendMovesAnonymousOnDisappear() async {
         let model = GapModel()
         var id: EffectID?
-        model[.watch]().id(&id)
+        (model[.watch]()).id(&id)
         #expect(id != nil)
         model.cancel(id!)
         #expect(model.log == ["gone"])
@@ -64,31 +64,31 @@ final class GapModel: ScreenModel<GapAction> {
     @Test func testRekeyAfterSendMovesAnonymousTask() async {
         let model = GapModel()
         var id: EffectID?
-        model[.work]().id(&id)
+        (model[.work]()).id(&id)
         model.cancel(id!)
         await waitUntil { model.log == ["work cancelled"] }
         #expect(model.log == ["work cancelled"])
     }
 
     @MainActor
-    @Test func testRekeyMovesANamedEffectAndReplacesTheTarget() {
+    @Test func testRekeyMovesANamedEffectAndReplacesTheTarget() async {
         let model = GapModel()
         var target: EffectID? = EffectID("target")
         model.send(.watch, id: &target)                 // something already stored at the target id
-        let call = model[.keep]()                       // stored under "keep"
-        call.id(&target)                                // move it to "target"; the old target finishes
+        let call = model[.keep]()                 // stored under "keep"
+        call.id(&target)                          // move it to "target"; the old target finishes
         #expect(model.log == ["gone"])
-        call.id(&target)                                // same key again: no-op
+        call.id(&target)                          // same key again: no-op
         model.cancel(target!)
         #expect(model.log == ["gone", "keep next"])
         let plain = model[.plain]()
         var none: EffectID?
-        plain.id(&none)                                 // nothing stored for this ticket: no-op
+        plain.id(&none)                           // nothing stored for this ticket: no-op
         #expect(model.log == ["gone", "keep next"])
     }
 
     @MainActor
-    @Test func testSendIdentifiedActionAndEffectIDFromValue() {
+    @Test func testSendIdentifiedActionAndEffectIDFromValue() async {
         let model = GapModel()
         let id = EffectID("custom")
         #expect(id == EffectID("custom"))
@@ -98,14 +98,14 @@ final class GapModel: ScreenModel<GapAction> {
     }
 
     @MainActor
-    @Test func testDefaultObservableDoesNothing() {
+    @Test func testDefaultObservableDoesNothing() async {
         let model = SilentModel()
         model.send(.watch)
         model.disappear()
     }
 
     @MainActor
-    @Test func testCancelTicketRunsAnonymousOnNextAndNamedEffect() {
+    @Test func testCancelTicketRunsAnonymousOnNextAndNamedEffect() async {
         let model = GapModel()
         model.send(.next)
         model.cancels[.next]!()
@@ -232,22 +232,20 @@ struct ParentStateRoot: View {
 
 @Suite(.serialized) final class SwiftUIHostTests {
     @MainActor
-    @Test func testParentStateReadsModelsProvidedAboveInARealHostingView() {
+    @Test func testParentStateReadsModelsProvidedAboveInARealHostingView() async {
         parentSeen = []
-        autoreleasepool {
-            let host = NSHostingView(rootView: ParentStateRoot())
-            let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: false)
-            window.isReleasedWhenClosed = false
-            window.contentView = host
-            host.layoutSubtreeIfNeeded()
-            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-            #expect(parentSeen.last == "count=0")
-            ViewModel<HostParentScreen, ParentScope>.make().send(.increment)
-            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-            host.layoutSubtreeIfNeeded()
-            #expect(parentSeen.last == "count=1")
-            window.contentView = nil
-        }
+        let host = NSHostingView(rootView: ParentStateRoot())
+        let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        #expect(parentSeen.last == "count=0")
+        ViewModel<HostParentScreen, ParentScope>.make().send(.increment)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        host.layoutSubtreeIfNeeded()
+        #expect(parentSeen.last == "count=1")
+        window.contentView = nil
     }
 
     @MainActor

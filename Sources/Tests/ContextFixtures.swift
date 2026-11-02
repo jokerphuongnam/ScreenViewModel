@@ -87,7 +87,7 @@ final class CounterLogic: ViewModelContext<CounterScreen> {
                     tracker.cancelled += 1
                     return
                 }
-                send(.loaded(value))
+                await send(.loaded(value))
             }
         case .loaded(let value):
             state.loaded = value
@@ -107,7 +107,7 @@ final class CounterLogic: ViewModelContext<CounterScreen> {
                 let value = try? await cache(key: key, staleTime: .seconds(60), gcTime: .seconds(60)) {
                     await service.fetch()
                 }
-                send(.loaded(value ?? -1))
+                await send(.loaded(value ?? -1))
             }
         }
     }

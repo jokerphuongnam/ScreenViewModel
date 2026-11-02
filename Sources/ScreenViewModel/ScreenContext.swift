@@ -109,7 +109,7 @@ public enum ActionEffect<Action> {
     /// Sends this action right after the current one.
     case send(Action)
     /// Async work. The same id replaces (cancels) the previous task. The view model's release cancels it.
-    case task(TaskPriority? = nil, id: AnyHashable? = nil, (_ send: @MainActor (Action) -> Void) async -> Void)
+    case task(TaskPriority? = nil, id: AnyHashable? = nil, (_ send: @MainActor (Action) async -> Void) async -> Void)
     /// Cancels the task or cleanup stored under `id`.
     case cancel(id: AnyHashable)
     /// Runs when the view model is released, or early through `.cancel(id:)` when it has an id.

@@ -4,14 +4,14 @@ import Testing
 
 @Suite(.serialized) final class ScreenActionCallTests {
     @MainActor
-    @Test func testSubscriptSendsAnEnumCase() {
+    @Test func testSubscriptSendsAnEnumCase() async {
         let model = Probe()
         model[.plain]()
         #expect(model.seen == [.plain])
     }
 
     @MainActor
-    @Test func testCallSendsTheStaticAction() {
+    @Test func testCallSendsTheStaticAction() async {
         let model = StaticProbe()
         model[.arm]()
         #expect(model.seen == [.arm])
@@ -20,7 +20,7 @@ import Testing
     }
 
     @MainActor
-    @Test func testMemberIdMatchesCallThenId() throws {
+    @Test func testMemberIdMatchesCallThenId() async throws {
         let direct = StaticProbe()
         var directID: EffectID?
         _ = direct[.arm].id(&directID)
@@ -29,7 +29,7 @@ import Testing
 
         let called = StaticProbe()
         var calledID: EffectID?
-        _ = called[.arm]().id(&calledID)
+        _ = (called[.arm]()).id(&calledID)
         called.cancel(try #require(calledID))
         #expect(called.log == ["held"])
     }

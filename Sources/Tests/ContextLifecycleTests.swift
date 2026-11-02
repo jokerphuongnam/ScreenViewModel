@@ -36,7 +36,7 @@ final class ParentOnlyLogic: ViewModelContext<ParentOnlyScreen> {
     }
 
     @MainActor
-    @Test func testChildSendsToParentViewModel() {
+    @Test func testChildSendsToParentViewModel() async {
         let parent = ViewModel(context: CounterLogic(tracker: Tracker()))
         let scope = ScreenScope().setting(parent)
         scope.model(ViewModel<CounterScreen, ViewState>.self)?.send(.increment)
@@ -44,7 +44,7 @@ final class ParentOnlyLogic: ViewModelContext<ParentOnlyScreen> {
     }
 
     @MainActor
-    @Test func testParentScopeMakeReturnsTheLiveInstanceAndReleasesIt() {
+    @Test func testParentScopeMakeReturnsTheLiveInstanceAndReleasesIt() async {
         let tracker = Tracker()
         weak var weakParent: ViewModel<ParentOnlyScreen, ParentScope>?
         do {
@@ -64,7 +64,7 @@ final class ParentOnlyLogic: ViewModelContext<ParentOnlyScreen> {
     // MARK: ShareState
 
     @MainActor
-    @Test func testShareStateReturnsOneInstancePerIdAndBuildsOnce() {
+    @Test func testShareStateReturnsOneInstancePerIdAndBuildsOnce() async {
         let tracker = Tracker()
         let id = UUID().uuidString
         let first = ViewModel<CounterScreen, ShareScope>.make(id: id, CounterLogic(tracker: tracker))
@@ -98,7 +98,7 @@ final class ParentOnlyLogic: ViewModelContext<ParentOnlyScreen> {
     }
 
     @MainActor
-    @Test func testShareViewModelWrapperJoinsTheGroupAndHoldsIt() {
+    @Test func testShareViewModelWrapperJoinsTheGroupAndHoldsIt() async {
         let tracker = Tracker()
         let id = UUID().uuidString
         let creator = ShareViewModel<CounterScreen>(wrappedValue: ViewModel<CounterScreen, ShareScope>.make(id: id, CounterLogic(tracker: tracker)), id: id)
@@ -114,7 +114,7 @@ final class ParentOnlyLogic: ViewModelContext<ParentOnlyScreen> {
     // MARK: GlobalState
 
     @MainActor
-    @Test func testGlobalStateKeepsTheFirstInstanceAndSkipsLaterContexts() {
+    @Test func testGlobalStateKeepsTheFirstInstanceAndSkipsLaterContexts() async {
         let tracker = Tracker()
         let id = UUID().uuidString
         let first = ViewModel<GlobalOnlyScreen, GlobalScope>.make(id: id, GlobalOnlyLogic(tracker: tracker))
