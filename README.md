@@ -72,19 +72,19 @@ A `ScreenModel` still owns its own fields. The app creates the objects below and
 
 | API | Lifetime | What it is for |
 | --- | --- | --- |
-| `globalState` / `@GlobalState` | From the first `globalState` until the app exits | One ViewModel for that type. A screen reads `@GlobalState`. Dropping a screen does not drop the model. |
-| `shareState` / `@ShareState` | While at least one joined screen is alive | One ViewModel for that id and model type. The same id with another model type is another group. The last screen of that group releases the model. |
-| `.parentState(_:)` / `@ParentState` | The parent view's model | Like `environmentObject`. Descendants read it. Views outside the modifier do not. Siblings do not see each other's models. |
+| `Type.make(id:_:)` / `Type.make(id:)` on `GlobalScope`. `globalState` and `@GlobalState` still exist. | From the first `make(id:_:)` for that id until the process ends | Global `make(id:_:)` stores the instance until the process ends. The same id always returns that same instance. A later `make(id:_:)` does not run the closure. `make(id:)` only reads it. Dropping every view does not destroy it. |
+| `Type.make(id:_:)` / `Type.make(id:)` on `ShareScope`. `shareState` and `@ShareState` still exist. | While something points at that instance | Share uses a weak registry. `make(id:_:)` runs the closure only when that id has no live instance. When nothing points at the instance, it is destroyed. A later `make(id:_:)` for that same id runs the closure again and starts a new lifetime. `make(id:)` only reads a live instance. If the id is empty it fatalErrors, because that call has no closure to create one. The same id with another model type is another group. |
+| `.parentState(_:)` | Until the parent instance is deallocated | The parent creates the one instance with `Type.make(context:)`; a later `make(context:)` while that instance is alive returns it and does not run the context. A child stores `@Bindable private var coordinator = Type.make()`. `make()` returns the live instance and does not create one. The out-of-tree case is not handled yet. When that instance is deallocated, the group is gone, the next life starts only when a new parent calls `make(context:)`, and there is no `@ParentState`. |
 | `cache` in a ViewModel | The result stays for `gcTime` after the call | One API call for that key and result type. The same key with another result type is another cache. A fresh value does not call again. |
 
-None of these retain the view. A view still disappears as usual. `shareState` and `globalState` only mean that view starts using the model.
+None of these retain the view. A view still disappears as usual. Storing a Global or Share `make` result only means that view starts using the model. `@GlobalState` and `@ShareState` still exist.
 
-Every view that reads a model updates when a property it uses changes. That includes the view storing `globalState` or `shareState`, `@GlobalState`, `@ShareState`, the parent that passes `.parentState`, and `@ParentState`.
+Every view that reads a model updates when a property it uses changes. That includes the view storing `globalState`, `shareState`, `Type.make(id:_:)`, or `Type.make(id:)`, `@GlobalState`, `@ShareState`, the owner that stores `make(context:)`, and the child that stores `@Bindable private var coordinator = Type.make()`. The out-of-tree case is not handled yet.
 
 ```swift
-@State private var session = globalState(SessionModel())
-@State private var note = shareState(id: "note", NoteModel())
-@State private var wizard = WizardModel()
+@State private var session = Type.make(id: "session", SessionLogic())
+@State private var note = Type.make(id: "note", NoteLogic())
+@Bindable private var coordinator = Type.make(context:)
 
 var body: some View {
     VStack {
@@ -92,26 +92,28 @@ var body: some View {
         Text(note.text)
         ParentChild()
     }
-    .parentState(wizard)
+    .parentState(coordinator)
 }
 
 struct GlobalReader: View {
-    @GlobalState private var session: SessionModel
+    @State private var session = Type.make(id: "session")
     var body: some View { Text(session.name) }
 }
 
 struct ShareReader: View {
-    @ShareState(id: "note") private var note: NoteModel
+    @State private var note = Type.make(id: "note")
     var body: some View { Text(note.text) }
 }
 
 struct ParentChild: View {
-    @ParentState private var wizard: WizardModel
-    var body: some View { Text(wizard.title) }
+    @Bindable private var coordinator = Type.make()
+    var body: some View {
+        Text(coordinator.title)
+    }
 }
 ```
 
-`@ShareState(id:) = NoteModel()` creates the instance only when that id has none yet. `@GlobalState` does not create one. Call `globalState` first.
+Global `make(id:_:)` stores the instance until the process ends. The same id always returns that same instance. A later `make(id:_:)` does not run the closure. `make(id:)` only reads it. Dropping every view does not destroy it. Share uses a weak registry. `make(id:_:)` runs the closure only when that id has no live instance. When nothing points at the instance, it is destroyed. A later `make(id:_:)` for that same id runs the closure again and starts a new lifetime. `make(id:)` only reads a live instance. If the id is empty it fatalErrors, because that call has no closure to create one. `@GlobalState` and `@ShareState` still exist. They are not the `make` calls.
 
 Call the API from the ViewModel. The view reads the fields the model stores.
 
@@ -143,7 +145,7 @@ let number = try await cache(key: "fact") { 1 } // Int cache, separate
 
 Two `String` calls need two keys. `cache(key: "fact")` and `cache(key: "title")` stay apart even though both return `String`. Reusing `"fact"` for a second string API reads and writes the fact cache.
 
-`shareState` uses the same rule. The same id and the same model type are one instance. The same id and another model type are another group. `@ShareState(id: "abc")` reads only the type written on the property.
+`shareState` and Share `make` use the same grouping rule. The same id and the same model type are one group. The same id and another model type are another group. Share uses a weak registry. `make(id:_:)` runs the closure only when that id has no live instance. When nothing points at the instance, it is destroyed. A later `make(id:_:)` for that same id runs the closure again and starts a new lifetime. `make(id:)` only reads a live instance. If the id is empty it fatalErrors, because that call has no closure to create one. `@ShareState(id: "abc")` still exists and reads only the type written on the property.
 
 A value that only the view displays uses `cached(key:_:)` or `@CacheState(key:)`. That is not the place for an API call. `cached.data`, `isFetching`, and `refetch()` describe that display value.
 
@@ -199,6 +201,7 @@ Tests live in `Sources/Tests`. Run them with `swift test`.
 | `1.5.0` | The same cache key with another result type is another cache. The same share id with another model type is another group |
 | `1.5.1` | This version list |
 | `2.0.0` | `.id(&)` generates an id for `.onNext`, `.onDisappear`, `.task`, and the action `.redirect` runs next. `.none` has no id. A switch on `.redirect` now includes that id. `cached(key:)` can be called off the main actor. `cache(key:)` also has a synchronous overload whose fetch runs on the caller |
+| `3.0.0` | Source parameter on `ViewModel`. `@ParentState` wrapper removed. The owner calls `ParentScope.make(context:)`. A child stores `@Bindable private var coordinator = Type.make()`. `make()` returns the live instance and does not create one. The out-of-tree case is not handled yet. Global and share owners call `Type.make(id:_:)`. Readers call `Type.make(id:)`. A Global id lives until the process ends; a Share id can be a new instance after the previous one is released. |
 
 ## Context ViewModel (2.1)
 
@@ -244,8 +247,8 @@ struct CounterView: View {
 - `ActionEffect`: `.none`, `.send`, `.task(priority:id:)` (running a task with the same id replaces the old one), `.cancel(id:)`, `.onDisappear`, `.merge`. All tasks are cancelled when the ViewModel is released.
 - Testing: `let viewModel = ViewModel(context: CounterLogic(service: .fake))`, then `viewModel.send(.increment)`, then `XCTAssertEqual(viewModel.count, 1)`.
 - Lifecycle with the new ViewModel:
-  - `globalState { ViewModel(context: …) }` / `@GlobalViewModel`
-  - `shareState(id:) { … }` / `@ShareViewModel(id:)`
-  - `.parentState(model)` / `@ParentState var parent: ViewModel<Parent>`
+  - Global owner: `Type.make(id: "session", SessionLogic())`. Reader: `Type.make(id: "session")`. Global `make(id:_:)` stores the instance until the process ends. The same id always returns that same instance. A later `make(id:_:)` does not run the closure. `make(id:)` only reads it. Dropping every view does not destroy it.
+  - Share owner: `Type.make(id: "note", NoteLogic())`. Reader: `Type.make(id: "note")`. Share uses a weak registry. `make(id:_:)` runs the closure only when that id has no live instance. When nothing points at the instance, it is destroyed. A later `make(id:_:)` for that same id runs the closure again and starts a new lifetime. `make(id:)` only reads a live instance. If the id is empty it fatalErrors, because that call has no closure to create one. The same id with another model type is another group.
+  - Parent: The parent creates the one instance with `Type.make(context:)`; a later `make(context:)` while that instance is alive returns it and does not run the context. A child stores `@Bindable private var coordinator = Type.make()`. `make()` returns the live instance and does not create one. The out-of-tree case is not handled yet. When that instance is deallocated, the group is gone, the next life starts only when a new parent calls `make(context:)`, and there is no `@ParentState`.
   - `cache(key:)` works inside `.task`
 - Source break: the old `protocol ViewModel` is now `ScreenModelProtocol`, because the name is taken by the new class.

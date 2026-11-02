@@ -20,23 +20,3 @@ extension View {
     }
 }
 
-/// The ViewModel declared by a parent view. A child can read its parent's model. It cannot read a sibling's model.
-@propertyWrapper
-public struct ParentState<Model: AnyObject>: DynamicProperty {
-    @Environment(\.screenScope) private var scope
-
-    public init() {}
-
-    public var wrappedValue: Model {
-        guard let model = scope.model(Model.self) else {
-            fatalError("No \(Model.self) above this view. Call parentState(_:) on a parent view.")
-        }
-        return model
-    }
-}
-
-extension ParentState where Model: Observable {
-    public var projectedValue: Bindable<Model> {
-        Bindable(wrappedValue)
-    }
-}

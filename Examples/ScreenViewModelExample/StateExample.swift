@@ -35,22 +35,36 @@ final class NoteModel: ScreenModel<NoteAction> {
     }
 }
 
-enum WizardAction: ScreenAction {
-    case retitle(String)
+enum WizardScreen: ScreenContext {
+    struct State: DefaultScreenState, Equatable { var title = "Wizard" }
+    enum Action { case retitle(String) }
 }
 
-@MainActor
-@Observable
-final class WizardModel: ScreenModel<WizardAction> {
-    var title = "Wizard"
-
-    override func observable(action: WizardAction, cancel: Cancel) -> Effect<WizardAction> {
+final class WizardLogic: ViewModelContext<WizardScreen> {
+    override func observable(action: WizardScreen.Action, state: inout WizardScreen.State, cancel: EffectCancel) -> ActionEffect<WizardScreen.Action> {
         if case .retitle(let title) = action {
-            self.title = title
+            state.title = title
         }
         return .none
     }
 }
+
+typealias WizardModel = ViewModel<WizardScreen, ParentScope>
+
+enum DeskScreen: ScreenContext {
+    struct State: DefaultScreenState, Equatable { var name = "Desk" }
+    enum Action { case rename(String) }
+}
+
+final class DeskLogic: ViewModelContext<DeskScreen> {
+    override func observable(action: DeskScreen.Action, state: inout DeskScreen.State, cancel: EffectCancel) -> ActionEffect<DeskScreen.Action> {
+        if case .rename(let name) = action { state.name = name }
+        return .none
+    }
+}
+
+typealias DeskModel = ViewModel<DeskScreen, GlobalScope>
+typealias SharedDeskModel = ViewModel<DeskScreen, ShareScope>
 
 enum FactAction: ScreenAction {
     case load
@@ -93,7 +107,9 @@ final class FactModel: ScreenModel<FactAction> {
 struct StateScreen: View {
     @State private var session = globalState(SessionModel())
     @State private var note = shareState(id: "note", NoteModel())
-    @State private var wizard = WizardModel()
+    @Bindable private var wizard = WizardModel.make(context: WizardLogic())
+    @Bindable private var desk = DeskModel.make(id: "desk", DeskLogic())
+    @Bindable private var sharedDesk = SharedDeskModel.make(id: "desk", DeskLogic())
     @State private var facts = FactModel()
 
     var body: some View {
@@ -105,6 +121,11 @@ struct StateScreen: View {
             Text("Share  \(note.text)")
             Button("Append share") { note[.append(" +")]() }
             ShareReader()
+
+            Text("Global view  \(desk.name)")
+            GlobalDeskReader()
+            Text("Share view  \(sharedDesk.name)")
+            ShareDeskReader()
 
             Text("Parent  \(wizard.title)")
             VStack(alignment: .leading) {
@@ -140,14 +161,32 @@ private struct ShareReader: View {
     }
 }
 
+private struct GlobalDeskReader: View {
+    @Bindable private var desk = DeskModel.make(id: "desk")
+
+    var body: some View {
+        Text("Global view reader  \(desk.name)")
+            .foregroundStyle(.secondary)
+    }
+}
+
+private struct ShareDeskReader: View {
+    @Bindable private var desk = SharedDeskModel.make(id: "desk")
+
+    var body: some View {
+        Text("Share view reader  \(desk.name)")
+            .foregroundStyle(.secondary)
+    }
+}
+
 private struct ParentChild: View {
-    @ParentState private var wizard: WizardModel
+    @Bindable private var wizard = WizardModel.make()
 
     var body: some View {
         VStack(alignment: .leading) {
             Text("Child  \(wizard.title)")
                 .foregroundStyle(.secondary)
-            Button("Retitle from child") { wizard[.retitle("Renamed")]() }
+            Button("Retitle from child") { wizard.send(.retitle("Renamed")) }
         }
     }
 }

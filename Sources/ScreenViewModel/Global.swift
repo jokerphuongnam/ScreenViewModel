@@ -15,6 +15,7 @@ public func globalState<Action, Model: ScreenModel<Action>>(_ model: Model) -> M
 @MainActor
 enum GlobalRegistry {
     private static var entries: [ObjectIdentifier: AnyObject] = [:]
+    private static var identified: [GlobalIdentity: AnyObject] = [:]
 
     static func insert<Model: AnyObject>(_ model: Model) -> Model {
         entries[ObjectIdentifier(Model.self)] = model
@@ -31,6 +32,27 @@ enum GlobalRegistry {
         }
         return model
     }
+
+    static func insert<Model: AnyObject>(id: String, _ model: Model) -> Model {
+        identified[GlobalIdentity(id: id, model: ObjectIdentifier(Model.self))] = model
+        return model
+    }
+
+    static func existing<Model: AnyObject>(id: String, as _: Model.Type) -> Model? {
+        identified[GlobalIdentity(id: id, model: ObjectIdentifier(Model.self))] as? Model
+    }
+
+    static func model<Model: AnyObject>(id: String) -> Model {
+        guard let model = existing(id: id, as: Model.self) else {
+            fatalError("No \(Model.self) global at id \(id). Create it with make(id:_:).")
+        }
+        return model
+    }
+}
+
+private struct GlobalIdentity: Hashable {
+    let id: String
+    let model: ObjectIdentifier
 }
 
 /// Returns the app-wide `ViewModel` for this screen, or registers `model` and returns it. Same lifetime as `globalState` for `ScreenModel`.

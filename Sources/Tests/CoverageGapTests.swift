@@ -201,21 +201,31 @@ final class GapModel: ScreenModel<GapAction> {
 @MainActor @Observable final class ParentProbe { var title = "parent" }
 @MainActor var parentSeen: [String] = []
 
+enum HostParentScreen: ScreenContext {
+    struct State: DefaultScreenState, Equatable { var count = 0 }
+    enum Action { case increment }
+}
+
+final class HostParentLogic: ViewModelContext<HostParentScreen> {
+    override func observable(action: HostParentScreen.Action, state: inout HostParentScreen.State, cancel: EffectCancel) -> ActionEffect<HostParentScreen.Action> {
+        if case .increment = action { state.count += 1 }
+        return .none
+    }
+}
+
 struct ParentStateChild: View {
-    @ParentState var parent: ParentProbe
-    @ParentState var screen: ViewModel<CounterScreen, ViewState>
+    @Bindable private var screen = ViewModel<HostParentScreen, ParentScope>.make()
+
     var body: some View {
-        let _ = parentSeen.append("\(parent.title) count=\(screen.count)")
-        Text(parent.title)
+        let _ = parentSeen.append("count=\(screen.count)")
+        Text("\(screen.count)")
     }
 }
 
 struct ParentStateRoot: View {
-    let parent: ParentProbe
-    let screen: ViewModel<CounterScreen, ViewState>
+    @Bindable private var screen = ViewModel<HostParentScreen, ParentScope>.make(context: HostParentLogic())
     var body: some View {
         ParentStateChild()
-            .parentState(parent)
             .parentState(screen)
     }
 }
@@ -224,21 +234,18 @@ struct ParentStateRoot: View {
     @MainActor
     @Test func testParentStateReadsModelsProvidedAboveInARealHostingView() {
         parentSeen = []
-        let parent = ParentProbe()
-        let screen = ViewModel(context: CounterLogic(tracker: Tracker()))
         autoreleasepool {
-            let host = NSHostingView(rootView: ParentStateRoot(parent: parent, screen: screen))
+            let host = NSHostingView(rootView: ParentStateRoot())
             let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = host
             host.layoutSubtreeIfNeeded()
             RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-            #expect(parentSeen.last == "parent count=0")
-            parent.title = "changed"
-            screen.send(.increment)
+            #expect(parentSeen.last == "count=0")
+            ViewModel<HostParentScreen, ParentScope>.make().send(.increment)
             RunLoop.main.run(until: Date().addingTimeInterval(0.2))
             host.layoutSubtreeIfNeeded()
-            #expect(parentSeen.last == "changed count=1")
+            #expect(parentSeen.last == "count=1")
             window.contentView = nil
         }
     }
