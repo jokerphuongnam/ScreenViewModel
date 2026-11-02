@@ -5,14 +5,14 @@ A small view-model loop for a SwiftUI screen. The view calls `send`. The screen 
 Platforms: macOS 14, iOS 17, watchOS 10, tvOS 17, and visionOS 1. The screen loop uses Foundation and Observation. Parent, global, and share injection use SwiftUI. There is no AppKit or UIKit dependency.
 
 ```swift
-.package(url: "https://github.com/jokerphuongnam/ScreenViewModel", from: "3.1.0")
+.package(url: "https://github.com/jokerphuongnam/ScreenViewModel", from: "3.1.1")
 ```
 
 ```swift
 import ScreenViewModel
 ```
 
-`3.1.0` is the current stable release. `store.send` and model `send` are synchronous. The action, its state update, and the redirect chain finish before `send` returns. A `.task` only stores the `Task`. Inside that task, `send` stays async. `3.0.0` is the source and `make` API, and `send` there is still synchronous. `ViewModel` requires a source: `ViewState`, `ParentScope`, `GlobalScope`, or `ShareScope`. `1.0.0` is the first stable API. Tags named `0.x.x-betaXX` are pre-release and are not a stable API. Version numbers follow [Semantic Versioning](https://semver.org/): the third number is a small backward compatible fix, the second number adds backward compatible API, and the first number changes only when existing API breaks. `from: "1.0.0"` accepts every `1.x` release. `2.0.0` adds `.id(&)` and gives `.redirect` an id, so a `switch` that matched `.redirect(let action)` must match the id as well. `.redirect(action)` still builds.
+The current source makes `send` synchronous. A view calls `store.send(.submit)` and does not write `await`. The action, its state update, and the redirect chain finish before `send` returns. A `.task` effect only stores the `Task` and returns; it does not wait for the task body. Inside that task, `send` stays async: `await send(...)` waits until that action and its redirect chain have updated state, and it does not wait for a nested `.task` body. `3.1.1` is the current stable release. `3.1.0` is this synchronous `store.send`; `send` inside a `.task` stays async. `3.0.0` is the source and `make` API, and `send` there is still synchronous. `ViewModel` requires a source: `ViewState`, `ParentScope`, `GlobalScope`, or `ShareScope`. `1.0.0` is the first stable API. Tags named `0.x.x-betaXX` are pre-release and are not a stable API. Version numbers follow [Semantic Versioning](https://semver.org/): the third number is a small backward compatible fix, the second number adds backward compatible API, and the first number changes only when existing API breaks. `from: "1.0.0"` accepts every `1.x` release. `2.0.0` adds `.id(&)` and gives `.redirect` an id, so a `switch` that matched `.redirect(let action)` must match the id as well. `.redirect(action)` still builds.
 
 ## Use it
 
@@ -48,7 +48,11 @@ final class DemoModel: ScreenModel<DemoAction> {
 @State private var loadID: EffectID?
 
 var body: some View {
-    Button("Load") { model.send(.load, id: &loadID) }
+    Button("Load") {
+        var id = loadID
+        model.send(.load, id: &id)
+        loadID = id
+    }
 }
 ```
 
@@ -204,6 +208,7 @@ Tests live in `Sources/Tests`. Run them with `swift test`.
 | `2.1.0` | `ViewModel<Screen, Source>` and `ViewModelContext` sit beside `ScreenModel`. `@ParentState` is still the property wrapper. `make(id:)` is not the Global or Share API yet |
 | `3.0.0` | `ViewModel` requires a source: `ViewState`, `ParentScope`, `GlobalScope`, or `ShareScope`. The `@ParentState` wrapper is removed. `.parentState(_:)` stays. The owner calls `Type.make(context:)`. A later `make(context:)` while that instance is alive returns it and does not run the context. A child calls `Type.make()`, which returns that instance or `fatalError` if no parent has created one. Global and Share owners call `Type.make(id:_:)` and readers call `Type.make(id:)`. A Global id lives until the process ends. A Share id is released when nothing points at it, and the next `make(id:_:)` starts a new instance. `send` is still synchronous |
 | `3.1.0` | `store.send` and model `send` are synchronous. The action, its state update, and the redirect chain finish before `send` returns. A `.task` effect only stores the `Task` and does not wait for the task body. Inside that task, `send` stays `async`: `await send` waits for that action and its redirect chain, and does not wait for a nested `.task` body |
+| `3.1.1` | Docs only. The version table matches the API in each tag. No API change |
 
 ## Context ViewModel (2.1)
 
