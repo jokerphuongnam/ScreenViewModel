@@ -92,6 +92,15 @@ open class ViewModelContext<Screen: ScreenContext> {
         if !stateEqual(before, next) { storage = next }
         return effect
     }
+
+    /// Writes stored state after `observable` has returned. Copies, runs `body`, and publishes only when the value changed.
+    @MainActor
+    public func updateState(_ body: (inout Screen.State) -> Void) {
+        let before = state
+        var next = before
+        body(&next)
+        if !stateEqual(before, next) { storage = next }
+    }
 }
 
 private func stateEqual<S>(_ a: S, _ b: S) -> Bool {
@@ -109,7 +118,7 @@ public enum ActionEffect<Action> {
     /// Sends this action right after the current one.
     case send(Action)
     /// Async work. The same id replaces (cancels) the previous task. The view model's release cancels it.
-    case task(TaskPriority? = nil, id: AnyHashable? = nil, (_ send: @MainActor (Action) async -> Void) async -> Void)
+    case task(TaskPriority? = nil, id: AnyHashable? = nil, (_ send: @escaping @MainActor (Action) async -> Void) async -> Void)
     /// Cancels the task or cleanup stored under `id`.
     case cancel(id: AnyHashable)
     /// Runs when the view model is released, or early through `.cancel(id:)` when it has an id.
