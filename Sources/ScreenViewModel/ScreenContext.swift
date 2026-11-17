@@ -92,6 +92,15 @@ open class ViewModelContext<Screen: ScreenContext> {
         if !stateEqual(before, next) { storage = next }
         return effect
     }
+
+    /// Writes stored state after `observable` has returned. Copies, runs `body`, and publishes only when the value changed.
+    @MainActor
+    public func updateState(_ body: (inout Screen.State) -> Void) {
+        let before = state
+        var next = before
+        body(&next)
+        if !stateEqual(before, next) { storage = next }
+    }
 }
 
 private func stateEqual<S>(_ a: S, _ b: S) -> Bool {
